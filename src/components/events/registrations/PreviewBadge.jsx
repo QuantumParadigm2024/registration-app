@@ -54,10 +54,10 @@ const PreviewBadge = ({
         fetchBadgeConfig();
     }, [eventId]);
 
-    // First fetch all badges
+    // Fetch badges based on props
     useEffect(() => {
         if (isSingleBadge && selectedRegistrationId) {
-            fetchAllBadgesFirst();
+            fetchSingleBadgeByRegistration();
         } else {
             fetchAllBadges();
         }
@@ -73,157 +73,51 @@ const PreviewBadge = ({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Fetch form fields from the event
-    const fetchFormFields = async () => {
-        try {
-            const response = await axiosInstance.get(`/events/${eventId}/form-fields`);
-            if (Array.isArray(response.data)) {
-                setFormFields(response.data);
-            } else if (response.data?.data && Array.isArray(response.data.data)) {
-                setFormFields(response.data.data);
-            }
-        } catch (err) {
-            console.error("Error fetching form fields:", err);
-        }
-    };
-
-    // Fetch badge configuration
-    const fetchBadgeConfig = async () => {
-        try {
-            const response = await axiosInstance.get(`/events/${eventId}/config`);
-            if (response.data?.status === "success" && response.data?.data) {
-                setBadgeConfig(response.data.data);
-                // Set selected fields from config
-                if (response.data.data.selectedFieldKeys) {
-                    setSelectedFields(response.data.data.selectedFieldKeys);
-                }
-            }
-        } catch (err) {
-            console.error("Error fetching badge config:", err);
-            // If 404, no config exists yet - that's fine
-            if (err.response?.status !== 404) {
-                console.error("Unexpected error:", err);
-            }
-        }
-    };
-
-    // Save badge configuration
-    const saveBadgeConfig = async () => {
-        if (selectedFields.length === 0) {
-            alert("Please select at least one field for the badge");
-            return;
-        }
-
-        setSavingConfig(true);
-        try {
-            const response = await axiosInstance.post(`/events/${eventId}/config`, {
-                selectedFieldKeys: selectedFields
-            });
-            
-            if (response.data?.status === "success") {
-                setBadgeConfig({ selectedFieldKeys: selectedFields });
-                setIsEditingConfig(false);
-                // Show success message (you might want to use a notification system)
-                alert("Badge format saved successfully!");
-            }
-        } catch (err) {
-            console.error("Error saving badge config:", err);
-            alert("Failed to save badge format. Please try again.");
-        } finally {
-            setSavingConfig(false);
-        }
-    };
-
-    // Get field value from badge (checks both root and responses)
-    const getFieldValue = (badge, fieldKey) => {
-        // Check if it's a default field from root object
-        if (fieldKey === "email") return badge.email || badge.responses?.email || "";
-        if (fieldKey === "phone" || fieldKey === "phone_number") {
-            return badge.phone || badge.responses?.phone || badge.responses?.phone_number || "";
-        }
-        if (fieldKey === "name") return badge.responses?.name || badge.name || "";
-        
-        // For other fields, check responses
-        return badge.responses?.[fieldKey] || "";
-    };
-
-    // Get display name from responses or root object
-    const getDisplayName = (badge) => {
-        return badge.responses?.name || badge.name || "Attendee";
-    };
-
-    const generateQRFromBadge = async (badge) => {
-        try {
-            // Create payload map matching backend structure
-            const payloadMap = {
-                name: getDisplayName(badge),
-                email: badge.email || badge.responses?.email || "",
-                badge: badge.badgeCode || `BDG-${badge.entryId}`,
-                entryId: badge.entryId,
-                event: badge.eventName || "Event"
-            };
-     
-            const qrPayload = JSON.stringify(payloadMap);
-        
-            const qrBase64 = await QRCode.toDataURL(qrPayload, {
-                width: 300, 
-                margin: 1,
-                errorCorrectionLevel: 'H',
-                color: {
-                    dark: '#000000',
-                    light: '#ffffff'
-                }
-            });
-
-            return qrBase64;
-        } catch (err) {
-            console.error(`Failed to generate QR for ${badge.entryId}:`, err);
-            return null;
-        }
-    };
-
-    // Load or generate QR image
-    const loadQRImage = async (badge) => {
-        try {
-            if (badge.qrUrl) {
-                const img = new Image();
-                img.crossOrigin = "Anonymous";
-                img.src = badge.qrUrl;
-
-                img.onload = () => {
-                    setQrImages(prev => ({ ...prev, [badge.entryId]: badge.qrUrl }));
-                    setFailedQrs(prev => ({ ...prev, [badge.entryId]: false }));
-                };
-
-                img.onerror = async () => {
-                    const generatedQR = await generateQRFromBadge(badge);
-                    if (generatedQR) {
-                        setQrImages(prev => ({ ...prev, [badge.entryId]: generatedQR }));
-                        setFailedQrs(prev => ({ ...prev, [badge.entryId]: false }));
-                    } else {
-                        setFailedQrs(prev => ({ ...prev, [badge.entryId]: true }));
-                    }
-                };
-            } else {
-                const generatedQR = await generateQRFromBadge(badge);
-                if (generatedQR) {
-                    setQrImages(prev => ({ ...prev, [badge.entryId]: generatedQR }));
-                    setFailedQrs(prev => ({ ...prev, [badge.entryId]: false }));
-                } else {
-                    setFailedQrs(prev => ({ ...prev, [badge.entryId]: true }));
-                }
-            }
-        } catch (err) {
-            console.error(`Error in loadQRImage for ${badge.entryId}:`, err);
-            setFailedQrs(prev => ({ ...prev, [badge.entryId]: true }));
-        }
-    };
-
-    // First fetch all badges to find the badge by entryId
-    const fetchAllBadgesFirst = async () => {
+    // Fetch single badge using the new endpoint: /events/{eventId}/badges/by-registration?registrationId={registrationId}
+    const fetchSingleBadgeByRegistration = async () => {
         try {
             setLoading(true);
             setError("");
+            
+            console.log(`Fetching badge for registration ID: ${selectedRegistrationId}`);
+            
+            const response = await axiosInstance.get(
+                `/events/${eventId}/badges/by-registration`,
+                {
+                    params: {
+                        registrationId: selectedRegistrationId
+                    }
+                }
+            );
+
+            console.log("Single badge response:", response.data);
+
+            if (response.data?.status === "success" && response.data?.data) {
+                const badgeData = response.data.data;
+                setSingleBadge(badgeData);
+                setBadges([badgeData]);
+                await loadQRImage(badgeData);
+            } else {
+                // If the new endpoint fails, fall back to the old method
+                console.warn("New endpoint failed, falling back to exportAll");
+                await fetchAllBadgesFirst();
+            }
+        } catch (err) {
+            console.error("Error fetching single badge:", err);
+            // Try fallback method
+            try {
+                await fetchAllBadgesFirst();
+            } catch (fallbackErr) {
+                setError(err.response?.data?.message || err.message || "Failed to load badge. Please try again.");
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Fallback method: fetch all badges and filter
+    const fetchAllBadgesFirst = async () => {
+        try {
             const response = await axiosInstance.get(`/events/${eventId}/badges/exportAll`);
 
             let badgesData = [];
@@ -237,6 +131,7 @@ const PreviewBadge = ({
 
             setAllBadgesList(badgesData);
 
+            // Try to find badge by entryId (registrationId)
             const foundBadge = badgesData.find(badge => badge.entryId === selectedRegistrationId);
 
             if (foundBadge) {
@@ -244,47 +139,53 @@ const PreviewBadge = ({
                 setBadges([foundBadge]);
                 await loadQRImage(foundBadge);
             } else {
-                try {
-                    await fetchSingleBadgeByEntryId();
-                } catch {
-                    setError("Badge not found");
-                }
+                setError("Badge not found for this registration");
             }
         } catch (err) {
-            console.error("Error fetching badges:", err);
-            setError("Failed to load badge. Please try again.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Try fetching by entryId
-    const fetchSingleBadgeByEntryId = async () => {
-        try {
-            const response = await axiosInstance.get(
-                `/events/${eventId}/badges/${selectedRegistrationId}`
-            );
-
-            if (response.data?.status === "success" && response.data.data) {
-                const badgeData = response.data.data;
-                setSingleBadge(badgeData);
-                setBadges([badgeData]);
-                await loadQRImage(badgeData);
-                return true;
-            }
-            return false;
-        } catch (err) {
-            console.error("EntryId endpoint failed:", err);
+            console.error("Error fetching badges in fallback:", err);
             throw err;
         }
     };
 
-    // Fetch all badges
+    // Fetch all badges (for bulk preview)
     const fetchAllBadges = async () => {
         try {
             setLoading(true);
             setError("");
 
+            // First try to get badges using the new method if there are selected registrations
+            if (selectedRegistrations && selectedRegistrations.length > 0) {
+                // For multiple badges, fetch each one individually
+                const badgePromises = selectedRegistrations.map(async (regId) => {
+                    try {
+                        const response = await axiosInstance.get(
+                            `/events/${eventId}/badges/by-registration`,
+                            { params: { registrationId: regId } }
+                        );
+                        if (response.data?.status === "success" && response.data?.data) {
+                            return response.data.data;
+                        }
+                        return null;
+                    } catch (err) {
+                        console.error(`Failed to fetch badge for registration ${regId}:`, err);
+                        return null;
+                    }
+                });
+
+                const badgeResults = await Promise.all(badgePromises);
+                const validBadges = badgeResults.filter(b => b !== null);
+                
+                if (validBadges.length > 0) {
+                    setBadges(validBadges);
+                    for (const badge of validBadges) {
+                        await loadQRImage(badge);
+                    }
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            // Fallback to exportAll if no specific registrations or if the new method failed
             const response = await axiosInstance.get(`/events/${eventId}/badges/exportAll`);
 
             let badgesData = [];
@@ -320,10 +221,153 @@ const PreviewBadge = ({
         }
     };
 
-    const retryLoadQR = (entryId) => {
-        const badge = badges.find(b => b.entryId === entryId) || singleBadge;
+    // Fetch form fields from the event
+    const fetchFormFields = async () => {
+        try {
+            const response = await axiosInstance.get(`/events/${eventId}/form-fields`);
+            if (Array.isArray(response.data)) {
+                setFormFields(response.data);
+            } else if (response.data?.data && Array.isArray(response.data.data)) {
+                setFormFields(response.data.data);
+            }
+        } catch (err) {
+            console.error("Error fetching form fields:", err);
+        }
+    };
+
+    // Fetch badge configuration
+    const fetchBadgeConfig = async () => {
+        try {
+            const response = await axiosInstance.get(`/events/${eventId}/config`);
+            if (response.data?.status === "success" && response.data?.data) {
+                setBadgeConfig(response.data.data);
+                if (response.data.data.selectedFieldKeys) {
+                    setSelectedFields(response.data.data.selectedFieldKeys);
+                }
+            }
+        } catch (err) {
+            console.error("Error fetching badge config:", err);
+            if (err.response?.status !== 404) {
+                console.error("Unexpected error:", err);
+            }
+        }
+    };
+
+    // Save badge configuration
+    const saveBadgeConfig = async () => {
+        if (selectedFields.length === 0) {
+            alert("Please select at least one field for the badge");
+            return;
+        }
+
+        setSavingConfig(true);
+        try {
+            const response = await axiosInstance.post(`/events/${eventId}/config`, {
+                selectedFieldKeys: selectedFields
+            });
+            
+            if (response.data?.status === "success") {
+                setBadgeConfig({ selectedFieldKeys: selectedFields });
+                setIsEditingConfig(false);
+                alert("Badge format saved successfully!");
+            }
+        } catch (err) {
+            console.error("Error saving badge config:", err);
+            alert("Failed to save badge format. Please try again.");
+        } finally {
+            setSavingConfig(false);
+        }
+    };
+
+    // Get field value from badge (checks both root and responses)
+    const getFieldValue = (badge, fieldKey) => {
+        // Check if it's a default field from root object
+        if (fieldKey === "email") return badge.email || badge.responses?.email || "";
+        if (fieldKey === "phone" || fieldKey === "phone_number") {
+            return badge.phone || badge.responses?.phone || badge.responses?.phone_number || "";
+        }
+        if (fieldKey === "name") return badge.responses?.name || badge.name || "";
+        
+        // For other fields, check responses
+        return badge.responses?.[fieldKey] || "";
+    };
+
+    // Get display name from responses or root object
+    const getDisplayName = (badge) => {
+        return badge.responses?.name || badge.name || "Attendee";
+    };
+
+    const generateQRFromBadge = async (badge) => {
+        try {
+            const payloadMap = {
+                name: getDisplayName(badge),
+                email: badge.email || badge.responses?.email || "",
+                badge: badge.badgeCode || badge.badgeId || `BDG-${badge.entryId || badge.registrationId}`,
+                entryId: badge.entryId || badge.registrationId,
+                event: badge.eventName || "Event"
+            };
+     
+            const qrPayload = JSON.stringify(payloadMap);
+        
+            const qrBase64 = await QRCode.toDataURL(qrPayload, {
+                width: 300, 
+                margin: 1,
+                errorCorrectionLevel: 'H',
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                }
+            });
+
+            return qrBase64;
+        } catch (err) {
+            console.error(`Failed to generate QR for ${badge.entryId || badge.registrationId}:`, err);
+            return null;
+        }
+    };
+
+    // Load or generate QR image
+    const loadQRImage = async (badge) => {
+        const badgeId = badge.entryId || badge.registrationId;
+        try {
+            if (badge.qrUrl) {
+                const img = new Image();
+                img.crossOrigin = "Anonymous";
+                img.src = badge.qrUrl;
+
+                img.onload = () => {
+                    setQrImages(prev => ({ ...prev, [badgeId]: badge.qrUrl }));
+                    setFailedQrs(prev => ({ ...prev, [badgeId]: false }));
+                };
+
+                img.onerror = async () => {
+                    const generatedQR = await generateQRFromBadge(badge);
+                    if (generatedQR) {
+                        setQrImages(prev => ({ ...prev, [badgeId]: generatedQR }));
+                        setFailedQrs(prev => ({ ...prev, [badgeId]: false }));
+                    } else {
+                        setFailedQrs(prev => ({ ...prev, [badgeId]: true }));
+                    }
+                };
+            } else {
+                const generatedQR = await generateQRFromBadge(badge);
+                if (generatedQR) {
+                    setQrImages(prev => ({ ...prev, [badgeId]: generatedQR }));
+                    setFailedQrs(prev => ({ ...prev, [badgeId]: false }));
+                } else {
+                    setFailedQrs(prev => ({ ...prev, [badgeId]: true }));
+                }
+            }
+        } catch (err) {
+            console.error(`Error in loadQRImage for ${badgeId}:`, err);
+            setFailedQrs(prev => ({ ...prev, [badgeId]: true }));
+        }
+    };
+
+    const retryLoadQR = (badgeId) => {
+        const badge = badges.find(b => (b.entryId || b.registrationId) === badgeId) || singleBadge;
         if (badge) {
-            setFailedQrs(prev => ({ ...prev, [entryId]: false }));
+            setFailedQrs(prev => ({ ...prev, [badgeId]: false }));
             loadQRImage(badge);
         }
     };
@@ -382,8 +426,8 @@ const PreviewBadge = ({
                     const payloadMap = {
                         name: displayName,
                         email: badge.email || badge.responses?.email || "",
-                        badge: badge.badgeCode || `BDG-${badge.entryId}`,
-                        entryId: badge.entryId,
+                        badge: badge.badgeCode || badge.badgeId || `BDG-${badge.entryId || badge.registrationId}`,
+                        entryId: badge.entryId || badge.registrationId,
                         event: badge.eventName || "Event"
                     };
 
@@ -411,12 +455,12 @@ const PreviewBadge = ({
                 // Badge Code
                 pdf.setFontSize(7);
                 pdf.setFont("helvetica", "bold");
-                pdf.text(badge.badgeCode || `BDG-${badge.entryId}`, centerX, 92, { align: "center" });
+                pdf.text(badge.badgeCode || badge.badgeId || `BDG-${badge.entryId || badge.registrationId}`, centerX, 92, { align: "center" });
             }
 
             let fileName;
             if (isSingleBadge) {
-                fileName = `${getDisplayName(badges[0])}_${badges[0]?.badgeCode || 'Badge'}.pdf`;
+                fileName = `${getDisplayName(badges[0])}_${badges[0]?.badgeCode || badges[0]?.badgeId || 'Badge'}.pdf`;
             } else {
                 fileName = selectedRegistrations?.length > 0
                     ? `Selected_Badges_Event_${eventId}.pdf`
@@ -460,7 +504,7 @@ const PreviewBadge = ({
                     <p className="text-gray-600 text-sm sm:text-base mb-6 sm:mb-8">We couldn't load your badge. Please try again.</p>
                     <div className="flex flex-col sm:flex-row justify-center space-y-2 sm:space-y-0 sm:space-x-4">
                         <button
-                            onClick={isSingleBadge ? fetchAllBadgesFirst : fetchAllBadges}
+                            onClick={isSingleBadge ? fetchSingleBadgeByRegistration : fetchAllBadges}
                             className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-500/30 transition-all duration-200 font-medium text-sm sm:text-base"
                         >
                             Try Again
@@ -594,7 +638,6 @@ const PreviewBadge = ({
                             <button
                                 onClick={() => {
                                     setIsEditingConfig(false);
-                                    // Revert to saved config if exists
                                     if (badgeConfig) {
                                         setSelectedFields(badgeConfig.selectedFieldKeys);
                                     }
@@ -676,86 +719,89 @@ const PreviewBadge = ({
                 <div className={`grid ${isSingleBadge 
                     ? 'grid-cols-1 justify-items-center' 
                     : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'} gap-4 sm:gap-5 md:gap-6 max-h-[70vh] overflow-y-auto p-1 sm:p-2 custom-scrollbar`}>
-                    {badges.map((badge) => (
-                        <div
-                            key={badge.entryId}
-                            className="group relative bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 overflow-hidden w-full"
-                            style={{
-                                maxWidth: isSingleBadge ? "400px" : "100%",
-                                margin: "0 auto"
-                            }}
-                        >
-                            {/* Decorative gradient bar */}
-                            <div className="absolute top-0 left-0 right-0 h-1.5 sm:h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
-                            
-                            <div className="p-4 sm:p-5 md:p-6">
-                                {/* Name with gradient text - Responsive */}
-                                <div className="text-center mb-3 sm:mb-4">
-                                    <h4 className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent truncate">
-                                        {getDisplayName(badge)}
-                                    </h4>
-                                </div>
-
-                                {/* Selected Fields from Config - ONLY VALUES, NO LABELS */}
-                                {selectedFields.length > 0 && (
-                                    <div className="space-y-2 sm:space-y-1 mb-4 sm:mb-6">
-                                        {selectedFields.map((fieldKey) => {
-                                            const value = getFieldValue(badge, fieldKey);
-                                            if (!value) return null;
-
-                                            return (
-                                                <div key={fieldKey} className="text-center">
-                                                    <p className="text-sm sm:text-base font-semibold text-gray-800 truncate px-2">
-                                                        {String(value)}
-                                                    </p>
-                                                </div>
-                                            );
-                                        })}
+                    {badges.map((badge) => {
+                        const badgeId = badge.entryId || badge.registrationId;
+                        return (
+                            <div
+                                key={badgeId}
+                                className="group relative bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 overflow-hidden w-full"
+                                style={{
+                                    maxWidth: isSingleBadge ? "400px" : "100%",
+                                    margin: "0 auto"
+                                }}
+                            >
+                                {/* Decorative gradient bar */}
+                                <div className="absolute top-0 left-0 right-0 h-1.5 sm:h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
+                                
+                                <div className="p-4 sm:p-5 md:p-6">
+                                    {/* Name with gradient text - Responsive */}
+                                    <div className="text-center mb-3 sm:mb-4">
+                                        <h4 className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent truncate">
+                                            {getDisplayName(badge)}
+                                        </h4>
                                     </div>
-                                )}
 
-                                {/* QR Code Section - Responsive sizing */}
-                                <div className="flex flex-col items-center">
-                                    <div className="relative">
-                                        <div className="absolute inset-0 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-2xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity duration-300"></div>
-                                        <div className="relative bg-white p-2 sm:p-3 rounded-2xl border border-gray-100 shadow-inner">
-                                            {qrImages[badge.entryId] ? (
-                                                <img
-                                                    src={qrImages[badge.entryId]}
-                                                    alt={`QR Code for ${getDisplayName(badge)}`}
-                                                    className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 object-contain"
-                                                />
-                                            ) : (
-                                                <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center">
-                                                    {failedQrs[badge.entryId] ? (
-                                                        <QrCode className="w-8 h-8 sm:w-10 sm:h-10 text-gray-400" />
-                                                    ) : (
-                                                        <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin text-blue-600" />
-                                                    )}
-                                                </div>
-                                            )}
+                                    {/* Selected Fields from Config - ONLY VALUES, NO LABELS */}
+                                    {selectedFields.length > 0 && (
+                                        <div className="space-y-2 sm:space-y-1 mb-4 sm:mb-6">
+                                            {selectedFields.map((fieldKey) => {
+                                                const value = getFieldValue(badge, fieldKey);
+                                                if (!value) return null;
+
+                                                return (
+                                                    <div key={fieldKey} className="text-center">
+                                                        <p className="text-sm sm:text-base font-semibold text-gray-800 truncate px-2">
+                                                            {String(value)}
+                                                        </p>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
-                                    </div>
-
-                                    {/* Badge Code - Responsive */}
-                                    <div className="mt-3 sm:mt-4 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full shadow-inner">
-                                        <p className="text-xs sm:text-sm font-mono font-bold text-gray-800 truncate max-w-[150px] sm:max-w-[180px]">
-                                            {badge.badgeCode || `BDG-${badge.entryId}`}
-                                        </p>
-                                    </div>
-
-                                    {failedQrs[badge.entryId] && (
-                                        <button
-                                            onClick={() => retryLoadQR(badge.entryId)}
-                                            className="mt-2 sm:mt-3 text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full transition-colors duration-200 font-medium"
-                                        >
-                                            Retry Loading QR
-                                        </button>
                                     )}
+
+                                    {/* QR Code Section - Responsive sizing */}
+                                    <div className="flex flex-col items-center">
+                                        <div className="relative">
+                                            <div className="absolute inset-0 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-2xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity duration-300"></div>
+                                            <div className="relative bg-white p-2 sm:p-3 rounded-2xl border border-gray-100 shadow-inner">
+                                                {qrImages[badgeId] ? (
+                                                    <img
+                                                        src={qrImages[badgeId]}
+                                                        alt={`QR Code for ${getDisplayName(badge)}`}
+                                                        className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 object-contain"
+                                                    />
+                                                ) : (
+                                                    <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center">
+                                                        {failedQrs[badgeId] ? (
+                                                            <QrCode className="w-8 h-8 sm:w-10 sm:h-10 text-gray-400" />
+                                                        ) : (
+                                                            <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin text-blue-600" />
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Badge Code - Responsive */}
+                                        <div className="mt-3 sm:mt-4 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full shadow-inner">
+                                            <p className="text-xs sm:text-sm font-mono font-bold text-gray-800 truncate max-w-[150px] sm:max-w-[180px]">
+                                                {badge.badgeCode || badge.badgeId || `BDG-${badgeId}`}
+                                            </p>
+                                        </div>
+
+                                        {failedQrs[badgeId] && (
+                                            <button
+                                                onClick={() => retryLoadQR(badgeId)}
+                                                className="mt-2 sm:mt-3 text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full transition-colors duration-200 font-medium"
+                                            >
+                                                Retry Loading QR
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 

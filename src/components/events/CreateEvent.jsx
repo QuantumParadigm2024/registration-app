@@ -196,6 +196,7 @@ const CreateEvent = () => {
         const description = document.getElementById("description").value;
         const startDate = document.getElementById("startDate").value;
         const endDate = document.getElementById("endDate").value;
+        const eventStartTime = document.getElementById("eventStartTime")?.value;
         const location = document.getElementById("location").value;
 
         const formData = new FormData();
@@ -203,6 +204,7 @@ const CreateEvent = () => {
         formData.append("description", description || "");
         formData.append("startDate", startDate || "");
         formData.append("endDate", endDate || "");
+        formData.append("eventStartTime", eventStartTime || "");
         formData.append("location", location || "");
         formData.append("logo", logoUrl || "");
 
@@ -517,6 +519,20 @@ const CreateEvent = () => {
                                             className="w-full border border-gray-300 p-2 rounded text-sm md:text-base"
                                         />
                                     </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Event Start Time
+                                        </label>
+                                        <input
+                                            type="time"
+                                            id="eventStartTime"
+                                            className={`w-full border ${formErrors.eventStartTime ? 'border-red-500' : 'border-gray-300'} p-2 rounded text-sm md:text-base`}
+                                            onChange={() => clearFieldError('eventStartTime')}
+                                        />
+                                        {formErrors.eventStartTime && (
+                                            <p className="text-red-500 text-xs mt-1">{formErrors.eventStartTime}</p>
+                                        )}
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -528,9 +544,10 @@ const CreateEvent = () => {
                                         className="w-full border border-gray-300 p-2 rounded min-h-[80px] md:min-h-[100px] text-sm md:text-base"
                                         maxLength={500}
                                         onChange={(e) => {
-                                            // Keep only first 500 characters
                                             const value = e.target.value.slice(0, 500);
                                             e.target.value = value;
+                                            const counter = document.getElementById("descriptionCounter");
+                                            if (counter) counter.textContent = value.length;
                                         }}
                                     />
                                     <div className="flex justify-between mt-1">

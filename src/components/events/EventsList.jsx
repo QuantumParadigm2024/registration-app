@@ -601,7 +601,7 @@ const EventsList = ({
                                         </div>
                                     </div>
 
-                                    {/* Event Dates */}
+                                    {/* Event Schedule */}
                                     <div>
                                         <h4 className="text-base font-semibold text-gray-800 mb-3 pb-2 border-b border-gray-200">Event Schedule</h4>
                                         <div className="space-y-3">
@@ -621,6 +621,50 @@ const EventsList = ({
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            {/* Event Start Time - Display below Start Date */}
+                                            {selectedEvent.eventStartTime && (
+                                                <div className="flex items-start text-gray-700">
+                                                    <svg className="w-4 h-4 mr-2 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <div>
+                                                        <div className="font-medium text-sm">Event Start Time</div>
+                                                        <div className="text-sm text-gray-600">
+                                                            {(() => {
+                                                                // Format the time to 12-hour format
+                                                                const timeStr = selectedEvent.eventStartTime;
+                                                                if (!timeStr) return 'Not set';
+
+                                                                // Check if it's already in HH:MM format
+                                                                if (timeStr.match(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)) {
+                                                                    const [hours, minutes] = timeStr.split(':');
+                                                                    const hour = parseInt(hours);
+                                                                    const ampm = hour >= 12 ? 'PM' : 'AM';
+                                                                    const hour12 = hour % 12 || 12;
+                                                                    return `${hour12}:${minutes} ${ampm}`;
+                                                                }
+
+                                                                // If it's a full datetime string, extract time
+                                                                try {
+                                                                    const date = new Date(timeStr);
+                                                                    if (!isNaN(date.getTime())) {
+                                                                        return date.toLocaleTimeString('en-US', {
+                                                                            hour: 'numeric',
+                                                                            minute: '2-digit',
+                                                                            hour12: true
+                                                                        });
+                                                                    }
+                                                                } catch (e) {
+                                                                    return timeStr;
+                                                                }
+                                                                return timeStr;
+                                                            })()}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             {selectedEvent.endDate && (
                                                 <div className="flex items-start text-gray-700">
                                                     <svg className="w-4 h-4 mr-2 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -731,7 +775,7 @@ const EventsList = ({
                                                                                 </h5>
                                                                                 <div className="flex items-center text-gray-600 text-xs mt-0.5">
                                                                                     <svg className="w-3 h-3 mr-1 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a22 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                                                                     </svg>
                                                                                     <span className="truncate">{user.email}</span>
                                                                                 </div>

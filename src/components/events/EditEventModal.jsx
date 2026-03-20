@@ -7,6 +7,7 @@ const EditEventModal = ({ event, onClose, onUpdate }) => {
         name: event.name || "",
         description: event.description || "",
         startDate: event.startDate ? new Date(event.startDate).toISOString().split('T')[0] : "",
+        eventStartTime: event.eventStartTime || "",
         endDate: event.endDate ? new Date(event.endDate).toISOString().split('T')[0] : "",
         location: event.location || "",
         logo: event.logo || event.logoUrl || ""
@@ -109,6 +110,7 @@ const EditEventModal = ({ event, onClose, onUpdate }) => {
                 name: formData.name,
                 description: formData.description || "",
                 startDate: formData.startDate,
+                eventStartTime: formData.eventStartTime || "",
                 endDate: formData.endDate || null,
                 location: formData.location || "",
                 logo: formData.logo || ""
@@ -199,7 +201,6 @@ const EditEventModal = ({ event, onClose, onUpdate }) => {
                                 Description
                             </label>
                             <textarea
-                                type="text"
                                 name="description"
                                 value={formData.description}
                                 maxLength={500}
@@ -221,7 +222,7 @@ const EditEventModal = ({ event, onClose, onUpdate }) => {
                             </div>
                         </div>
 
-                        {/* Dates */}
+                        {/* Dates and Time */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -239,18 +240,37 @@ const EditEventModal = ({ event, onClose, onUpdate }) => {
                                     <p className="text-red-500 text-xs mt-1">{formErrors.startDate}</p>
                                 )}
                             </div>
+                            {/* End Date */}
+                            <div className="gblock text-sm font-medium text-gray-700 mb-1">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        End Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        name="endDate"
+                                        value={formData.endDate || ""}
+                                        onChange={handleInputChange}
+                                        className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                        disabled={isSubmitting}
+                                    />
+                                </div>
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    End Date
+                                    Event Start Time
                                 </label>
                                 <input
-                                    type="date"
-                                    name="endDate"
-                                    value={formData.endDate || ""}
+                                    type="time"
+                                    name="eventStartTime"
+                                    value={formData.eventStartTime}
                                     onChange={handleInputChange}
                                     className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                                     disabled={isSubmitting}
                                 />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Optional: Set the time when the event starts
+                                </p>
                             </div>
                         </div>
 
@@ -368,7 +388,6 @@ const EditEventModal = ({ event, onClose, onUpdate }) => {
             </div>
         </div>
     );
-
 };
 
-export default EditEventModal
+export default EditEventModal;
