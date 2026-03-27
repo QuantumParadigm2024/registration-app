@@ -1,7 +1,7 @@
 import { Route, Routes, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import './App.css'
-import Register from './components/Register'
-import Login from './components/Login'
+import Register from './auth/Register.jsx'
+import Login from './auth/Login.jsx'
 import Dashboard from './components/dashboard/Dashboard'
 import Home from './staticPages/home/Home'
 import PrivateRoute from './helper/PrivateRoute'
@@ -20,9 +20,6 @@ import PrivacyPolicy from './staticPages/privacyPolicy/PrivacyPolicy'
 import ManageEvent from './components/events/ManageEvent'
 import PublicRegistrationForm from './components/events/PublicRegistrationForm'
 import EventTracking from './components/events/tracking/EventTracking';
-import ForgotPassword from './components/ForgotPassword'
-import VerifyOTP from './components/VerifyOTP'
-import ResetPassword from './components/ResetPassword'
 import EventRegistrationsPage from './components/events/EventRegistrationsPage'
 import { useNotification } from './contestAPI/NotificationProvider'
 import Cookies from 'js-cookie';
@@ -30,6 +27,10 @@ import UserAnalytics from './/components/analytics/UserAnalytics'
 import UserReport from './components/analytics/UserReport'
 import EventAnalytics from './components/analytics/EventAnalytics'
 import QRScanPage from './components/events/tracking/QRScanPage'
+import ContactUs from './staticPages/contactus'
+import NotFoundPage from './NotFoundPage'
+import BookDemoPage from './staticPages/home/BookDemoPage'
+import VerifyEmail from './auth/VerifyEmail.jsx'
 
 // Loading component
 const LoadingSpinner = () => (
@@ -418,17 +419,16 @@ const App = () => {
             <Route path="/about" element={<AboutUs />} />
             <Route path="/privacyPolicy" element={<PrivacyPolicy />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/contact" element={<ContactUs />} />
+            <Route path='*' element={<NotFoundPage/>}/>
+            <Route path='/book-demo' element={<BookDemoPage/>}/>
+
 
             {/* Public registration form routes */}
             <Route path="/:eventName/register/:eventKey" element={<PublicRegistrationForm />} />
             <Route path="/register/:eventKey" element={<PublicRegistrationForm />} />
-
-            {/* Forgot Password Routes */}
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/verify-otp" element={<VerifyOTP />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-
             <Route path="/event-registrations/:eventId" element={<EventRegistrationsPage />} />
 
             {/* Protected routes - only these require authentication */}
@@ -446,6 +446,7 @@ const App = () => {
                     <Route path="/user-report" element={<UserReport />} />
                     <Route path="/event-analytics/:eventId" element={<EventAnalytics />} />
                     <Route path="/qr-scan/:eventId" element={<QRScanPage />} />
+                    
                 </Route>
             </Route>
         </Routes>

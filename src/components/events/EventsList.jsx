@@ -120,14 +120,18 @@ const EventsList = ({
     // Check if current user has permission to assign users
     const canAssignUsers = currentUser && (
         currentUser.platformRole === "ROLE_EVENT_ADMIN" ||
-        currentUser.highestEventRole === "ROLE_EVENT_ADMIN"
+        currentUser.highestEventRole === "ROLE_EVENT_ADMIN"||
+        currentUser.platformRole === "ROLE_USER" ||
+        currentUser.highestEventRole === "ROLE_USER"
     );
 
     // Check if current user has permission to manage events
     const canManageEvent = currentUser && (
         currentUser.platformRole === "ROLE_SUPER_ADMIN" ||
         currentUser.platformRole === "ROLE_EVENT_ADMIN" ||
-        currentUser.highestEventRole === "ROLE_EVENT_ADMIN"
+        currentUser.highestEventRole === "ROLE_EVENT_ADMIN"||
+        currentUser.platformRole === "ROLE_USER" ||
+        currentUser.highestEventRole === "ROLE_USER"
     );
 
     // If form is showing, don't display events list
