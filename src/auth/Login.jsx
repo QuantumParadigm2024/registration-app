@@ -53,7 +53,8 @@ const Login = () => {
             const EVENT_ADMIN_ROLES = [
                 "ROLE_EVENT_ADMIN",
                 "ROLE_ADMIN",
-                "ROLE_COORDINATOR"
+                "ROLE_COORDINATOR",
+                "ROLE_USER"
             ];
 
             const user = meRes.data;

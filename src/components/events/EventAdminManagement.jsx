@@ -1,21 +1,17 @@
 import { useState, useEffect } from "react";
 import axiosInstance from "../../helper/AxiosInstance";
-import EventsList from "./EventsList";
-import { 
-  Search, 
-  FilterList, 
-  Close, 
-  Refresh,
-  Dashboard,
-  Event,
-  Assessment,
-  Timeline,
-  Schedule,
-  Group,
-  LocationOn,
-  ChevronRight,
-  CalendarToday,
-  TrendingUp
+import EventsList from "../events/EventsList";
+import CreateEventForm from "../events/CreateEventForm";
+import {
+    Search,
+    FilterList,
+    Close,
+    Refresh,
+    Dashboard,
+    Event,
+    Timeline,
+    Schedule,
+    LocationOn
 } from "@mui/icons-material";
 
 const EventAdminManagement = () => {
@@ -24,6 +20,7 @@ const EventAdminManagement = () => {
     const [isLoadingEvents, setIsLoadingEvents] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
+    const [showForm, setShowForm] = useState(false);
 
     // Fetch events on component mount
     useEffect(() => {
@@ -92,22 +89,19 @@ const EventAdminManagement = () => {
     });
 
     // Calculate stats
-    const totalRegistrations = events.reduce((sum, event) => sum + (event.registrations || 0), 0);
     const activeEvents = events.filter(e => getEventStatus(e) === 'active').length;
     const upcomingEvents = events.filter(e => getEventStatus(e) === 'upcoming').length;
-    const completedEvents = events.filter(e => getEventStatus(e) === 'completed').length;
 
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Notification Component */}
             {notification.show && (
-                <div className={`fixed top-0 left-0 right-0 z-[100] px-4 py-3 shadow-lg animate-slideDown md:left-auto md:right-4 md:top-4 md:rounded-lg md:max-w-md ${
-                    notification.type === "success" 
-                        ? "bg-green-500 text-white" 
-                        : notification.type === "error" 
-                        ? "bg-red-500 text-white" 
+                <div className={`fixed top-0 left-0 right-0 z-[100] px-4 py-3 shadow-lg animate-slideDown md:left-auto md:right-4 md:top-4 md:rounded-lg md:max-w-md ${notification.type === "success"
+                    ? "bg-green-500 text-white"
+                    : notification.type === "error"
+                        ? "bg-red-500 text-white"
                         : "bg-blue-500 text-white"
-                }`}>
+                    }`}>
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                             {notification.type === "success" ? (
@@ -125,7 +119,7 @@ const EventAdminManagement = () => {
                             )}
                             <span className="font-medium text-sm md:text-base break-words">{notification.message}</span>
                         </div>
-                        <button 
+                        <button
                             onClick={() => setNotification({ show: false, message: "", type: "" })}
                             className="p-1 hover:bg-white/20 rounded-full transition-colors flex-shrink-0"
                         >
@@ -143,7 +137,7 @@ const EventAdminManagement = () => {
                         <Dashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span>Dashboard Overview</span>
                     </div>
-                    
+
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4">
                         <div>
                             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">
@@ -155,36 +149,32 @@ const EventAdminManagement = () => {
                             </p>
                         </div>
 
-                        {/* Quick Stats - Hidden on mobile, shown on tablet+ */}
-                        <div className="hidden md:flex items-center gap-4 bg-white rounded-lg px-4 py-2 border border-gray-200 shadow-sm">
-                            <div>
-                                <p className="text-xs text-gray-500">Total Events</p>
-                                <p className="text-xl font-bold text-indigo-600">{events.length}</p>
-                            </div>
-                            <div className="w-px h-8 bg-gray-200"></div>
-                            <div>
-                                <p className="text-xs text-gray-500">Active</p>
-                                <p className="text-xl font-bold text-green-600">{activeEvents}</p>
-                            </div>
-                        </div>
-
-                        {/* Mobile Quick Stats - Simple pill */}
-                        <div className="flex md:hidden items-center gap-2">
-                            <div className="bg-indigo-50 rounded-full px-3 py-1.5">
-                                <span className="text-xs font-medium text-indigo-700">
-                                    {events.length} Total
-                                </span>
-                            </div>
-                            <div className="bg-green-50 rounded-full px-3 py-1.5">
-                                <span className="text-xs font-medium text-green-700">
-                                    {activeEvents} Active
-                                </span>
-                            </div>
-                        </div>
+                        {/* Add Event Button */}
+                        <button
+                            className={`${showForm ?
+                                "p-3 rounded-full" :
+                                "px-6 py-3 rounded-3xl flex items-center space-x-2"
+                                } bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 transition-all duration-300 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 cursor-pointer`}
+                            onClick={() => setShowForm(!showForm)}
+                            title={showForm ? "Close Form" : "Add New Event"}
+                        >
+                            {showForm ? (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            ) : (
+                                <>
+                                    <span className="font-semibold">Add Event</span>
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                </>
+                            )}
+                        </button>
                     </div>
                 </div>
 
-                {/* Search and Filter */}
+                {/* Search and Filter - ALWAYS VISIBLE */}
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-6 sm:mb-8">
                     {/* Search Input */}
                     <div className="relative flex-1">
@@ -222,95 +212,107 @@ const EventAdminManagement = () => {
                     </div>
                 </div>
 
-                {/* Stats Cards */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-6 sm:mb-8">
-                    {/* Total Events Card */}
-                    <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-center justify-between">
-                            <div className="min-w-0">
-                                <p className="text-xs text-gray-500 mb-0.5 sm:mb-1 truncate">Total Events</p>
-                                <p className="text-lg sm:text-2xl font-bold text-gray-900">{events.length}</p>
+                {/* Stats Cards - ONLY SHOW WHEN FORM IS NOT OPEN */}
+                {!showForm && (
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-6 sm:mb-8">
+                        {/* Total Events Card */}
+                        <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-center justify-between">
+                                <div className="min-w-0">
+                                    <p className="text-xs text-gray-500 mb-0.5 sm:mb-1 truncate">Total Events</p>
+                                    <p className="text-lg sm:text-2xl font-bold text-gray-900">{events.length}</p>
+                                </div>
+                                <div className="p-2 sm:p-3 bg-indigo-100 rounded-lg flex-shrink-0">
+                                    <Event className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
+                                </div>
                             </div>
-                            <div className="p-2 sm:p-3 bg-indigo-100 rounded-lg flex-shrink-0">
-                                <Event className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
+                        </div>
+
+                        {/* Active Events Card */}
+                        <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-center justify-between">
+                                <div className="min-w-0">
+                                    <p className="text-xs text-gray-500 mb-0.5 sm:mb-1 truncate">Active</p>
+                                    <p className="text-lg sm:text-2xl font-bold text-gray-900">{activeEvents}</p>
+                                </div>
+                                <div className="p-2 sm:p-3 bg-green-100 rounded-lg flex-shrink-0">
+                                    <Timeline className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Upcoming Events Card */}
+                        <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-center justify-between">
+                                <div className="min-w-0">
+                                    <p className="text-xs text-gray-500 mb-0.5 sm:mb-1 truncate">Upcoming</p>
+                                    <p className="text-lg sm:text-2xl font-bold text-gray-900">{upcomingEvents}</p>
+                                </div>
+                                <div className="p-2 sm:p-3 bg-orange-100 rounded-lg flex-shrink-0">
+                                    <Schedule className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" />
+                                </div>
                             </div>
                         </div>
                     </div>
+                )}
 
-                    {/* Active Events Card */}
-                    <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-center justify-between">
-                            <div className="min-w-0">
-                                <p className="text-xs text-gray-500 mb-0.5 sm:mb-1 truncate">Active</p>
-                                <p className="text-lg sm:text-2xl font-bold text-gray-900">{activeEvents}</p>
-                            </div>
-                            <div className="p-2 sm:p-3 bg-green-100 rounded-lg flex-shrink-0">
-                                <Timeline className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Upcoming Events Card */}
-                    <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-center justify-between">
-                            <div className="min-w-0">
-                                <p className="text-xs text-gray-500 mb-0.5 sm:mb-1 truncate">Upcoming</p>
-                                <p className="text-lg sm:text-2xl font-bold text-gray-900">{upcomingEvents}</p>
-                            </div>
-                            <div className="p-2 sm:p-3 bg-orange-100 rounded-lg flex-shrink-0">
-                                <Schedule className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Events List Section Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                        <h2 className="text-base sm:text-lg font-semibold text-gray-900">
-                            Events List
-                        </h2>
-                        <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 bg-indigo-50 text-indigo-700 text-xs sm:text-sm font-medium rounded-full">
-                            {filteredEvents.length} events
-                        </span>
-                        {searchQuery && (
-                            <span className="text-xs sm:text-sm text-gray-500 truncate max-w-[150px] sm:max-w-none">
-                                Filtered: "{searchQuery}"
-                            </span>
-                        )}
-                    </div>
-                    <button 
-                        onClick={fetchEvents}
-                        className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3 py-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors text-xs sm:text-sm font-medium self-start sm:self-auto"
-                    >
-                        <Refresh className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        Refresh
-                    </button>
-                </div>
-
-                {/* Events List */}
-                {isLoadingEvents ? (
-                    <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-                        <div className="p-4 sm:p-8">
-                            <div className="flex flex-col items-center justify-center py-8 sm:py-12">
-                                <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 border-3 border-indigo-200 border-t-indigo-600 mb-3 sm:mb-4"></div>
-                                <p className="text-xs sm:text-sm text-gray-500">Loading your events...</p>
-                            </div>
-                        </div>
-                    </div>
+                {/* Conditional Rendering: Show either CreateEventForm OR Events List */}
+                {showForm ? (
+                    <CreateEventForm
+                        onEventCreated={fetchEvents}
+                        onCancel={() => setShowForm(false)}
+                    />
                 ) : (
-                    <div className="overflow-x-auto -mx-3 sm:mx-0">
-                        <div className="inline-block min-w-full align-middle px-3 sm:px-0">
-                            <EventsList
-                                events={filteredEvents}
-                                isLoading={false}
-                                showForm={false}
-                                searchQuery={searchQuery}
-                                statusFilter={statusFilter}
-                                onRefreshEvents={fetchEvents}
-                            />
+                    <>
+                        {/* Events List Section Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                                <h2 className="text-base sm:text-lg font-semibold text-gray-900">
+                                    Events List
+                                </h2>
+                                <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 bg-indigo-50 text-indigo-700 text-xs sm:text-sm font-medium rounded-full">
+                                    {filteredEvents.length} events
+                                </span>
+                                {searchQuery && (
+                                    <span className="text-xs sm:text-sm text-gray-500 truncate max-w-[150px] sm:max-w-none">
+                                        Filtered: "{searchQuery}"
+                                    </span>
+                                )}
+                            </div>
+                            <button
+                                onClick={fetchEvents}
+                                className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3 py-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors text-xs sm:text-sm font-medium self-start sm:self-auto"
+                            >
+                                <Refresh className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                Refresh
+                            </button>
                         </div>
-                    </div>
+
+                        {/* Events List */}
+                        {isLoadingEvents ? (
+                            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                                <div className="p-4 sm:p-8">
+                                    <div className="flex flex-col items-center justify-center py-8 sm:py-12">
+                                        <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 border-3 border-indigo-200 border-t-indigo-600 mb-3 sm:mb-4"></div>
+                                        <p className="text-xs sm:text-sm text-gray-500">Loading your events...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto -mx-3 sm:mx-0">
+                                <div className="inline-block min-w-full align-middle px-3 sm:px-0">
+                                    <EventsList
+                                        events={filteredEvents}
+                                        isLoading={false}
+                                        showForm={false}
+                                        searchQuery={searchQuery}
+                                        statusFilter={statusFilter}
+                                        onRefreshEvents={fetchEvents}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 

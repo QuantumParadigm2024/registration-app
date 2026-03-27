@@ -4,8 +4,8 @@ import axios from "axios";
 
 // Create axios instance
 const axiosInstance = axios.create({
-  // baseURL: "http://localhost:9090",
-  baseURL:"https://registration.planotechevents.com:9090",
+  baseURL: "http://localhost:9090",
+  // baseURL:"https://registration.planotechevents.com:9090",
   withCredentials: true,
 });
 
