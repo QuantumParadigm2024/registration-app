@@ -207,7 +207,7 @@ const EventAdminDashboard = () => {
                     </p>
                     <Link to="/events" className="block">
                         <button className="w-full cursor-pointer bg-blue-500 hover:bg-blue-600 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-3xl font-semibold text-sm sm:text-base transition-all duration-200 hover:shadow-lg border-0 focus:outline-none focus:ring-2 focus:ring-blue-300">
-                            Manage My Events
+                            Create and Manage Events
                         </button>
                     </Link>
                     <div className="mt-4 text-xs text-gray-400 space-y-1">
@@ -352,97 +352,6 @@ const EventAdminDashboard = () => {
             </div>
 
             {/* Bottom Grid - EXACTLY SAME */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                {/* Recent Registrations - EXACTLY SAME */}
-                <div className="bg-white rounded-xl p-4 sm:p-6 shadow border border-gray-200">
-                    <div className="flex items-center justify-between mb-4 sm:mb-6">
-                        <h3 className="font-semibold text-base sm:text-lg text-gray-900">Recent Registrations</h3>
-                        <Link to="/registrations">
-                            <button className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap">
-                                View All →
-                            </button>
-                        </Link>
-                    </div>
-                    <div className="space-y-2 sm:space-y-3">
-                        {myRecentRegistrations.map((reg) => (
-                            <div key={reg.id} className="flex flex-col xs:flex-row xs:items-center justify-between p-2 sm:p-3 hover:bg-gray-50 rounded-lg transition-colors gap-2 xs:gap-0">
-                                <div className="min-w-0">
-                                    <h4 className="font-medium text-sm sm:text-base text-gray-900 truncate">{reg.name}</h4>
-                                    <p className="text-xs sm:text-sm text-gray-500 truncate">{reg.event}</p>
-                                </div>
-                                <div className="flex flex-wrap items-center gap-2 xs:gap-4">
-                                    <span className="text-xs text-gray-400">{reg.time}</span>
-                                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(reg.status)} whitespace-nowrap`}>
-                                        {getStatusIcon(reg.status)}
-                                        <span className="hidden xs:inline">{reg.status.charAt(0).toUpperCase() + reg.status.slice(1)}</span>
-                                    </div>
-                                    <button className="text-xs text-blue-600 hover:text-blue-700">
-                                        Details
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Team Management & Pending Tasks - EXACTLY SAME */}
-                <div className="bg-white rounded-xl p-4 sm:p-6 shadow border border-gray-200">
-                    <div className="flex items-center justify-between mb-4 sm:mb-6">
-                        <h3 className="font-semibold text-base sm:text-lg text-gray-900">Team & Tasks</h3>
-                        <Link to="/team-management">
-                            <button className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap">
-                                Manage Team →
-                            </button>
-                        </Link>
-                    </div>
-
-                    {/* Team Members Section */}
-                    <div className="mb-4 sm:mb-6">
-                        <h4 className="font-medium text-sm sm:text-base text-gray-700 mb-2 sm:mb-3">Team Members</h4>
-                        <div className="space-y-2 sm:space-y-3">
-                            {teamMembers.map((member) => (
-                                <div key={member.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg">
-                                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                                        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center flex-shrink-0">
-                                            <span className="font-medium text-blue-700 text-xs sm:text-sm">
-                                                {member.name.split(' ').map(n => n[0]).join('')}
-                                            </span>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <h4 className="font-medium text-gray-900 text-xs sm:text-sm truncate">{member.name}</h4>
-                                            <p className="text-xs text-gray-500 truncate">{member.role}</p>
-                                        </div>
-                                    </div>
-                                    <div className="text-right flex-shrink-0 ml-2">
-                                        <div className="text-xs sm:text-sm text-gray-600">{member.assignedTasks} tasks</div>
-                                        <button className="text-xs text-blue-600 hover:text-blue-700">
-                                            Assign
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Pending Tasks Section */}
-                    <div>
-                        <h4 className="font-medium text-sm sm:text-base text-gray-700 mb-2 sm:mb-3">Pending Tasks</h4>
-                        <div className="space-y-2">
-                            {pendingTasks.map((task) => (
-                                <div key={task.id} className="flex flex-col xs:flex-row xs:items-center justify-between p-2 hover:bg-gray-50 rounded-lg gap-2 xs:gap-0">
-                                    <div className="min-w-0">
-                                        <h4 className="font-medium text-gray-900 text-xs sm:text-sm truncate">{task.title}</h4>
-                                        <p className="text-xs text-gray-500 truncate">{task.event} • Due: {task.due}</p>
-                                    </div>
-                                    <div className={`px-2 py-1 rounded text-xs font-medium ${getPriorityColor(task.priority)} whitespace-nowrap self-start xs:self-auto`}>
-                                        {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             {/* Quick Actions - UPDATED with User Analytics and User Report */}
             <div className="mt-6 sm:mt-8 grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">

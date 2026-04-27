@@ -128,7 +128,9 @@ const VerifyEmail = () => {
         try {
             // Resend OTP via POST request
             const response = await axiosInstance.post('/user/resend-otp', {
-                email: email
+               params: {
+            email: email
+        }
             });
 
             setSuccess(response.data.message || 'Verification code sent successfully!');

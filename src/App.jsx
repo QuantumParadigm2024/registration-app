@@ -31,6 +31,7 @@ import ContactUs from './staticPages/contactus'
 import NotFoundPage from './NotFoundPage'
 import BookDemoPage from './staticPages/home/BookDemoPage'
 import VerifyEmail from './auth/VerifyEmail.jsx'
+import PaymentDetails from './components/payment/PaymentDetails.jsx'
 
 // Loading component
 const LoadingSpinner = () => (
@@ -446,6 +447,7 @@ const App = () => {
                     <Route path="/user-report" element={<UserReport />} />
                     <Route path="/event-analytics/:eventId" element={<EventAnalytics />} />
                     <Route path="/qr-scan/:eventId" element={<QRScanPage />} />
+                    <Route path="/payment-details" element={<PaymentDetails />} />
                     
                 </Route>
             </Route>

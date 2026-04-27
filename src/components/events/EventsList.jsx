@@ -320,10 +320,8 @@ const EventsList = ({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                     {localEvents.map((event) => {
-                        // Determine event status
                         const status = getEventStatus(event);
 
-                        // If we're filtering by status, only show matching events
                         if (statusFilter !== 'all' && status !== statusFilter) {
                             return null;
                         }
@@ -397,10 +395,10 @@ const EventsList = ({
                                             src={event.logo || event.logoUrl}
                                             alt="Event logo"
                                             className="h-12 w-auto object-contain"
-                                            onError={(e) => {
-                                                e.target.onerror = null;
-                                                e.target.src = "https://via.placeholder.com/100x40?text=Logo";
-                                            }}
+                                            // onError={(e) => {
+                                            //     e.target.onerror = null;
+                                            //     e.target.src = "https://via.placeholder.com/100x40?text=Logo";
+                                            // }}
                                         />
                                     </div>
                                 )}
@@ -545,10 +543,10 @@ const EventsList = ({
                                             src={selectedEvent.logo || selectedEvent.logoUrl}
                                             alt="Event logo"
                                             className="max-h-14 max-w-full object-contain"
-                                            onError={(e) => {
-                                                e.target.onerror = null;
-                                                e.target.src = 'https://via.placeholder.com/80x56?text=Event+Logo';
-                                            }}
+                                            // onError={(e) => {
+                                            //     e.target.onerror = null;
+                                            //     e.target.src = 'https://via.placeholder.com/80x56?text=Event+Logo';
+                                            // }}
                                         />
                                     </div>
                                 </div>
