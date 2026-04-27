@@ -1,23 +1,877 @@
+// import React, { useEffect, useRef, useState, useMemo } from "react";
+// import { useParams } from "react-router-dom";
+// import axiosInstance from "../../../helper/AxiosInstance";
+// import jsPDF from "jspdf";
+// import QRCode from "qrcode";
+// import { 
+//     Loader2, 
+//     Download, 
+//     X, 
+//     ChevronDown, 
+//     User, 
+//     Mail, 
+//     Phone, 
+//     QrCode, 
+//     Badge as BadgeIcon, 
+//     Check, 
+//     Layers,
+//     Save,
+//     Edit,
+//     Settings
+// } from "lucide-react";
+
+// const PreviewBadge = ({
+//     onClose,
+//     selectedRegistrations,
+//     allRegistrations,
+//     selectedRegistrationId,
+//     isSingleBadge = false
+// }) => {
+//     const { eventId } = useParams();
+//     const [badges, setBadges] = useState([]);
+//     const [singleBadge, setSingleBadge] = useState(null);
+//     const [loading, setLoading] = useState(true);
+//     const [error, setError] = useState("");
+//     const [downloading, setDownloading] = useState(false);
+//     const [qrImages, setQrImages] = useState({});
+//     const [failedQrs, setFailedQrs] = useState({});
+//     const [allBadgesList, setAllBadgesList] = useState([]);
+
+//     // Badge configuration states
+//     const [formFields, setFormFields] = useState([]);
+//     const [badgeConfig, setBadgeConfig] = useState(null);
+//     const [selectedFields, setSelectedFields] = useState([]);
+//     const [isEditingConfig, setIsEditingConfig] = useState(false);
+//     const [savingConfig, setSavingConfig] = useState(false);
+//     const [openDropdown, setOpenDropdown] = useState(false);
+//     const [activeTab, setActiveTab] = useState('grid');
+
+//     const dropdownRef = useRef(null);
+
+//     // Fetch form fields and badge configuration on mount
+//     useEffect(() => {
+//         fetchFormFields();
+//         fetchBadgeConfig();
+//     }, [eventId]);
+
+//     // Fetch badges based on props
+//     useEffect(() => {
+//         if (isSingleBadge && selectedRegistrationId) {
+//             fetchSingleBadgeByRegistration();
+//         } else {
+//             fetchAllBadges();
+//         }
+//     }, [eventId, selectedRegistrationId, isSingleBadge, selectedRegistrations]);
+
+//     useEffect(() => {
+//         const handleClickOutside = (e) => {
+//             if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+//                 setOpenDropdown(false);
+//             }
+//         };
+//         document.addEventListener("mousedown", handleClickOutside);
+//         return () => document.removeEventListener("mousedown", handleClickOutside);
+//     }, []);
+
+//     // Fetch single badge using the new endpoint: /events/{eventId}/badges/by-registration?registrationId={registrationId}
+//     const fetchSingleBadgeByRegistration = async () => {
+//         try {
+//             setLoading(true);
+//             setError("");
+
+//             console.log(`Fetching badge for registration ID: ${selectedRegistrationId}`);
+
+//             const response = await axiosInstance.get(
+//                 `/events/${eventId}/badges/by-registration`,
+//                 {
+//                     params: {
+//                         registrationId: selectedRegistrationId
+//                     }
+//                 }
+//             );
+
+//             console.log("Single badge response:", response.data);
+
+//             if (response.data?.status === "success" && response.data?.data) {
+//                 const badgeData = response.data.data;
+//                 setSingleBadge(badgeData);
+//                 setBadges([badgeData]);
+//                 await loadQRImage(badgeData);
+//             } else {
+//                 // If the new endpoint fails, fall back to the old method
+//                 console.warn("New endpoint failed, falling back to exportAll");
+//                 await fetchAllBadgesFirst();
+//             }
+//         } catch (err) {
+//             console.error("Error fetching single badge:", err);
+//             // Try fallback method
+//             try {
+//                 await fetchAllBadgesFirst();
+//             } catch (fallbackErr) {
+//                 setError(err.response?.data?.message || err.message || "Failed to load badge. Please try again.");
+//             }
+//         } finally {
+//             setLoading(false);
+//         }
+//     };
+
+//     // Fallback method: fetch all badges and filter
+//     const fetchAllBadgesFirst = async () => {
+//         try {
+//             const response = await axiosInstance.get(`/events/${eventId}/badges/exportAll`);
+
+//             let badgesData = [];
+//             if (response.data?.status === "success" && Array.isArray(response.data.data)) {
+//                 badgesData = response.data.data;
+//             } else if (Array.isArray(response.data)) {
+//                 badgesData = response.data;
+//             } else if (Array.isArray(response.data?.data)) {
+//                 badgesData = response.data.data;
+//             }
+
+//             setAllBadgesList(badgesData);
+
+//             // Try to find badge by entryId (registrationId)
+//             const foundBadge = badgesData.find(badge => badge.entryId === selectedRegistrationId);
+
+//             if (foundBadge) {
+//                 setSingleBadge(foundBadge);
+//                 setBadges([foundBadge]);
+//                 await loadQRImage(foundBadge);
+//             } else {
+//                 setError("Badge not found for this registration");
+//             }
+//         } catch (err) {
+//             console.error("Error fetching badges in fallback:", err);
+//             throw err;
+//         }
+//     };
+
+//     // Fetch all badges (for bulk preview)
+//     const fetchAllBadges = async () => {
+//         try {
+//             setLoading(true);
+//             setError("");
+
+//             // First try to get badges using the new method if there are selected registrations
+//             if (selectedRegistrations && selectedRegistrations.length > 0) {
+//                 // For multiple badges, fetch each one individually
+//                 const badgePromises = selectedRegistrations.map(async (regId) => {
+//                     try {
+//                         const response = await axiosInstance.get(
+//                             `/events/${eventId}/badges/by-registration`,
+//                             { params: { registrationId: regId } }
+//                         );
+//                         if (response.data?.status === "success" && response.data?.data) {
+//                             return response.data.data;
+//                         }
+//                         return null;
+//                     } catch (err) {
+//                         console.error(`Failed to fetch badge for registration ${regId}:`, err);
+//                         return null;
+//                     }
+//                 });
+
+//                 const badgeResults = await Promise.all(badgePromises);
+//                 const validBadges = badgeResults.filter(b => b !== null);
+
+//                 if (validBadges.length > 0) {
+//                     setBadges(validBadges);
+//                     for (const badge of validBadges) {
+//                         await loadQRImage(badge);
+//                     }
+//                     setLoading(false);
+//                     return;
+//                 }
+//             }
+
+//             // Fallback to exportAll if no specific registrations or if the new method failed
+//             const response = await axiosInstance.get(`/events/${eventId}/badges/exportAll`);
+
+//             let badgesData = [];
+//             if (response.data?.status === "success" && Array.isArray(response.data.data)) {
+//                 badgesData = response.data.data;
+//             } else if (Array.isArray(response.data)) {
+//                 badgesData = response.data;
+//             } else if (Array.isArray(response.data?.data)) {
+//                 badgesData = response.data.data;
+//             }
+
+//             setAllBadgesList(badgesData);
+
+//             let filteredBadges = [];
+//             if (selectedRegistrations && selectedRegistrations.length > 0) {
+//                 filteredBadges = badgesData.filter(badge =>
+//                     selectedRegistrations.includes(badge.entryId)
+//                 );
+//             } else {
+//                 filteredBadges = badgesData;
+//             }
+
+//             setBadges(filteredBadges);
+
+//             for (const badge of filteredBadges) {
+//                 await loadQRImage(badge);
+//             }
+//         } catch (err) {
+//             console.error("Error fetching badges:", err);
+//             setError("Failed to load badges. Please try again.");
+//         } finally {
+//             setLoading(false);
+//         }
+//     };
+
+//     // Fetch form fields from the event
+//     const fetchFormFields = async () => {
+//         try {
+//             const response = await axiosInstance.get(`/events/${eventId}/form-fields`);
+//             if (Array.isArray(response.data)) {
+//                 setFormFields(response.data);
+//             } else if (response.data?.data && Array.isArray(response.data.data)) {
+//                 setFormFields(response.data.data);
+//             }
+//         } catch (err) {
+//             console.error("Error fetching form fields:", err);
+//         }
+//     };
+
+//     // Fetch badge configuration
+//     const fetchBadgeConfig = async () => {
+//         try {
+//             const response = await axiosInstance.get(`/events/${eventId}/config`);
+//             if (response.data?.status === "success" && response.data?.data) {
+//                 setBadgeConfig(response.data.data);
+//                 if (response.data.data.selectedFieldKeys) {
+//                     setSelectedFields(response.data.data.selectedFieldKeys);
+//                 }
+//             }
+//         } catch (err) {
+//             console.error("Error fetching badge config:", err);
+//             if (err.response?.status !== 404) {
+//                 console.error("Unexpected error:", err);
+//             }
+//         }
+//     };
+
+//     // Save badge configuration
+//     const saveBadgeConfig = async () => {
+//         if (selectedFields.length === 0) {
+//             alert("Please select at least one field for the badge");
+//             return;
+//         }
+
+//         setSavingConfig(true);
+//         try {
+//             const response = await axiosInstance.post(`/events/${eventId}/config`, {
+//                 selectedFieldKeys: selectedFields
+//             });
+
+//             if (response.data?.status === "success") {
+//                 setBadgeConfig({ selectedFieldKeys: selectedFields });
+//                 setIsEditingConfig(false);
+//                 alert("Badge format saved successfully!");
+//             }
+//         } catch (err) {
+//             console.error("Error saving badge config:", err);
+//             alert("Failed to save badge format. Please try again.");
+//         } finally {
+//             setSavingConfig(false);
+//         }
+//     };
+
+//     // Get field value from badge (checks both root and responses)
+//     const getFieldValue = (badge, fieldKey) => {
+//         // Check if it's a default field from root object
+//         if (fieldKey === "email") return badge.email || badge.responses?.email || "";
+//         if (fieldKey === "phone" || fieldKey === "phone_number") {
+//             return badge.phone || badge.responses?.phone || badge.responses?.phone_number || "";
+//         }
+//         if (fieldKey === "name") return badge.responses?.name || badge.name || "";
+
+//         // For other fields, check responses
+//         return badge.responses?.[fieldKey] || "";
+//     };
+
+//     // Get display name from responses or root object
+//     const getDisplayName = (badge) => {
+//         return badge.responses?.name || badge.name || "Attendee";
+//     };
+
+//     const generateQRFromBadge = async (badge) => {
+//         try {
+//             const payloadMap = {
+//                 name: getDisplayName(badge),
+//                 email: badge.email || badge.responses?.email || "",
+//                 badge: badge.badgeCode || badge.badgeId || `BDG-${badge.entryId || badge.registrationId}`,
+//                 entryId: badge.entryId || badge.registrationId,
+//                 event: badge.eventName || "Event"
+//             };
+
+//             const qrPayload = JSON.stringify(payloadMap);
+
+//             const qrBase64 = await QRCode.toDataURL(qrPayload, {
+//                 width: 300, 
+//                 margin: 1,
+//                 errorCorrectionLevel: 'H',
+//                 color: {
+//                     dark: '#000000',
+//                     light: '#ffffff'
+//                 }
+//             });
+
+//             return qrBase64;
+//         } catch (err) {
+//             console.error(`Failed to generate QR for ${badge.entryId || badge.registrationId}:`, err);
+//             return null;
+//         }
+//     };
+
+//     // Load or generate QR image
+//     const loadQRImage = async (badge) => {
+//         const badgeId = badge.entryId || badge.registrationId;
+//         try {
+//             if (badge.qrUrl) {
+//                 const img = new Image();
+//                 img.crossOrigin = "Anonymous";
+//                 img.src = badge.qrUrl;
+
+//                 img.onload = () => {
+//                     setQrImages(prev => ({ ...prev, [badgeId]: badge.qrUrl }));
+//                     setFailedQrs(prev => ({ ...prev, [badgeId]: false }));
+//                 };
+
+//                 img.onerror = async () => {
+//                     const generatedQR = await generateQRFromBadge(badge);
+//                     if (generatedQR) {
+//                         setQrImages(prev => ({ ...prev, [badgeId]: generatedQR }));
+//                         setFailedQrs(prev => ({ ...prev, [badgeId]: false }));
+//                     } else {
+//                         setFailedQrs(prev => ({ ...prev, [badgeId]: true }));
+//                     }
+//                 };
+//             } else {
+//                 const generatedQR = await generateQRFromBadge(badge);
+//                 if (generatedQR) {
+//                     setQrImages(prev => ({ ...prev, [badgeId]: generatedQR }));
+//                     setFailedQrs(prev => ({ ...prev, [badgeId]: false }));
+//                 } else {
+//                     setFailedQrs(prev => ({ ...prev, [badgeId]: true }));
+//                 }
+//             }
+//         } catch (err) {
+//             console.error(`Error in loadQRImage for ${badgeId}:`, err);
+//             setFailedQrs(prev => ({ ...prev, [badgeId]: true }));
+//         }
+//     };
+
+//     const retryLoadQR = (badgeId) => {
+//         const badge = badges.find(b => (b.entryId || b.registrationId) === badgeId) || singleBadge;
+//         if (badge) {
+//             setFailedQrs(prev => ({ ...prev, [badgeId]: false }));
+//             loadQRImage(badge);
+//         }
+//     };
+
+//     const toggleField = (fieldKey) => {
+//         setSelectedFields((prev) => {
+//             if (prev.includes(fieldKey)) {
+//                 return prev.filter((f) => f !== fieldKey);
+//             }
+//             return [...prev, fieldKey];
+//         });
+//     };
+
+//     const handleDownloadPDF = async () => {
+//         if (!badges.length) {
+//             alert("No badges to download");
+//             return;
+//         }
+
+//         setDownloading(true);
+
+//         try {
+//             const pdf = new jsPDF({
+//                 orientation: "portrait",
+//                 unit: "mm",
+//                 format: [76, 102],
+//             });
+
+//             for (let i = 0; i < badges.length; i++) {
+//                 const badge = badges[i];
+
+//                 if (i !== 0) pdf.addPage();
+
+//                 const centerX = 38;
+
+//                 // Name - Always show
+//                 const displayName = getDisplayName(badge);
+//                 pdf.setFontSize(16);
+//                 pdf.setFont("helvetica", "bold");
+//                 pdf.text(displayName, centerX, 20, { align: "center" });
+
+//                 // Selected field values from config - No labels, just values
+//                 pdf.setFontSize(9);
+//                 pdf.setFont("helvetica", "normal");
+//                 let y = 28;
+
+//                 selectedFields.forEach((fieldKey) => {
+//                     const value = getFieldValue(badge, fieldKey);
+//                     if (!value) return;
+//                     pdf.text(String(value), centerX, y, { align: "center" });
+//                     y += 6;
+//                 });
+
+//                 // Generate QR Code for PDF
+//                 try {
+//                     const payloadMap = {
+//                         name: displayName,
+//                         email: badge.email || badge.responses?.email || "",
+//                         badge: badge.badgeCode || badge.badgeId || `BDG-${badge.entryId || badge.registrationId}`,
+//                         entryId: badge.entryId || badge.registrationId,
+//                         event: badge.eventName || "Event"
+//                     };
+
+//                     const qrPayload = JSON.stringify(payloadMap);
+
+//                     const qrBase64 = await QRCode.toDataURL(qrPayload, {
+//                         width: 300,
+//                         margin: 1,
+//                         errorCorrectionLevel: 'H',
+//                         color: {
+//                             dark: '#000000',
+//                             light: '#ffffff'
+//                         }
+//                     });
+
+//                     const qrSize = 40;
+//                     const qrX = (76 - qrSize) / 2;
+//                     const qrY = 45;
+
+//                     pdf.addImage(qrBase64, "PNG", qrX, qrY, qrSize, qrSize);
+//                 } catch (err) {
+//                     console.error("QR generation failed:", err);
+//                 }
+
+//                 // Badge Code
+//                 pdf.setFontSize(7);
+//                 pdf.setFont("helvetica", "bold");
+//                 pdf.text(badge.badgeCode || badge.badgeId || `BDG-${badge.entryId || badge.registrationId}`, centerX, 92, { align: "center" });
+//             }
+
+//             let fileName;
+//             if (isSingleBadge) {
+//                 fileName = `${getDisplayName(badges[0])}_${badges[0]?.badgeCode || badges[0]?.badgeId || 'Badge'}.pdf`;
+//             } else {
+//                 fileName = selectedRegistrations?.length > 0
+//                     ? `Selected_Badges_Event_${eventId}.pdf`
+//                     : `All_Badges_Event_${eventId}.pdf`;
+//             }
+
+//             pdf.save(fileName);
+//         } catch (err) {
+//             console.error("PDF generation failed:", err);
+//             alert("Failed to generate PDF. Please try again.");
+//         } finally {
+//             setDownloading(false);
+//         }
+//     };
+
+//     if (loading) {
+//         return (
+//             <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl shadow-xl p-6 sm:p-8 md:p-12 max-w-4xl mx-auto m-4">
+//                 <div className="text-center">
+//                     <div className="relative">
+//                         <div className="absolute inset-0 flex items-center justify-center">
+//                             <div className="w-16 h-16 sm:w-20 sm:h-20 bg-blue-100 rounded-full animate-pulse"></div>
+//                         </div>
+//                         <Loader2 className="w-12 h-12 sm:w-16 sm:h-16 animate-spin mx-auto text-blue-600 relative" />
+//                     </div>
+//                     <p className="text-gray-700 text-base sm:text-lg font-medium mt-4 sm:mt-6">Loading your badge...</p>
+//                     <p className="text-gray-500 text-xs sm:text-sm mt-1 sm:mt-2">Preparing a perfect preview for you</p>
+//                 </div>
+//             </div>
+//         );
+//     }
+
+//     if (error) {
+//         return (
+//             <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl shadow-xl p-6 sm:p-8 md:p-12 max-w-4xl mx-auto m-4">
+//                 <div className="text-center">
+//                     <div className="w-20 h-20 sm:w-24 sm:h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+//                         <span className="text-3xl sm:text-4xl">⚠️</span>
+//                     </div>
+//                     <p className="text-red-600 text-lg sm:text-xl font-semibold mb-2 sm:mb-3">{error}</p>
+//                     <p className="text-gray-600 text-sm sm:text-base mb-6 sm:mb-8">We couldn't load your badge. Please try again.</p>
+//                     <div className="flex flex-col sm:flex-row justify-center space-y-2 sm:space-y-0 sm:space-x-4">
+//                         <button
+//                             onClick={isSingleBadge ? fetchSingleBadgeByRegistration : fetchAllBadges}
+//                             className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-500/30 transition-all duration-200 font-medium text-sm sm:text-base"
+//                         >
+//                             Try Again
+//                         </button>
+//                         <button
+//                             onClick={onClose}
+//                             className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 bg-white text-gray-700 rounded-xl hover:bg-gray-50 border border-gray-300 shadow-lg transition-all duration-200 font-medium text-sm sm:text-base"
+//                         >
+//                             Close
+//                         </button>
+//                     </div>
+//                 </div>
+//             </div>
+//         );
+//     }
+
+//     return (
+//         <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 max-w-7xl mx-auto m-2 sm:m-4 border border-gray-100">
+//             {/* Enhanced Header - Responsive */}
+//             <div className="flex flex-col lg:flex-row lg:items-start justify-between mb-6 sm:mb-8 pb-4 sm:pb-6 border-b border-gray-200/80">
+//                 <div className="flex flex-col sm:flex-row sm:items-start space-y-1 sm:space-y-0 sm:space-x-4">
+//                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
+//                         <BadgeIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+//                     </div>
+//                     <div className="flex-1">
+//                         <h2 className="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+//                             {isSingleBadge ? 'Badge Preview' : 'Badges Preview'}
+//                         </h2>
+//                         <div className="flex flex-wrap items-center mt-2 gap-2">
+//                             <div className="px-2 sm:px-3 py-1 bg-blue-50 rounded-full text-blue-700 text-xs sm:text-sm font-medium flex items-center">
+//                                 <Layers className="w-3 h-3 mr-1 flex-shrink-0" />
+//                                 <span className="truncate max-w-[180px] sm:max-w-none">
+//                                     {isSingleBadge
+//                                         ? `Badge for ${getDisplayName(singleBadge) || 'Attendee'}`
+//                                         : `${badges.length} badge${badges.length !== 1 ? 's' : ''} ready for export`
+//                                     }
+//                                 </span>
+//                             </div>
+//                             {badgeConfig && !isEditingConfig && (
+//                                 <div className="px-2 sm:px-3 py-1 bg-green-50 rounded-full text-green-700 text-xs sm:text-sm font-medium flex items-center">
+//                                     <Check className="w-3 h-3 mr-1" />
+//                                     <span>Format: {selectedFields.length} field{selectedFields.length !== 1 ? 's' : ''}</span>
+//                                 </div>
+//                             )}
+//                         </div>
+//                     </div>
+//                 </div>
+
+//                 {/* Action Buttons - Stack on mobile */}
+//                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 mt-4 lg:mt-0">
+//                     {/* Badge Format Configuration Button */}
+//                     <button
+//                         onClick={() => setIsEditingConfig(!isEditingConfig)}
+//                         className="w-full sm:w-auto group px-4 sm:px-5 py-2.5 sm:py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 shadow-lg shadow-purple-500/30 transition-all duration-200 flex items-center justify-center space-x-2 text-sm sm:text-base"
+//                     >
+//                         {isEditingConfig ? (
+//                             <>
+//                                 <Settings className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
+//                                 <span className="font-medium">Editing Format</span>
+//                             </>
+//                         ) : (
+//                             <>
+//                                 <Edit className="w-4 h-4" />
+//                                 <span className="font-medium">
+//                                     {badgeConfig ? 'Edit Badge Format' : 'Configure Badge Format'}
+//                                 </span>
+//                             </>
+//                         )}
+//                     </button>
+
+//                     {/* Download Button */}
+//                     <button
+//                         onClick={handleDownloadPDF}
+//                         disabled={downloading || badges.length === 0}
+//                         className="w-full sm:w-auto group px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed shadow-lg shadow-green-500/30 transition-all duration-200 flex items-center justify-center space-x-2 text-sm sm:text-base"
+//                     >
+//                         {downloading ? (
+//                             <>
+//                                 <Loader2 className="w-4 h-4 animate-spin" />
+//                                 <span className="font-medium">Generating PDF...</span>
+//                             </>
+//                         ) : (
+//                             <>
+//                                 <Download className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+//                                 <span className="font-medium">{isSingleBadge ? 'Download Badge' : 'Download PDF'}</span>
+//                             </>
+//                         )}
+//                     </button>
+
+//                     {/* Close Button */}
+//                     <button
+//                         onClick={onClose}
+//                         className="absolute top-4 right-4 sm:relative sm:top-auto sm:right-auto p-2 sm:p-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all duration-200"
+//                     >
+//                         <X className="w-5 h-5" />
+//                     </button>
+//                 </div>
+//             </div>
+
+//             {/* Badge Format Configuration Panel */}
+//             {isEditingConfig && (
+//                 <div className="mb-8 p-4 sm:p-6 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border border-purple-200/50">
+//                     <div className="flex items-start justify-between mb-4">
+//                         <div>
+//                             <h3 className="text-lg sm:text-xl font-semibold text-gray-800 flex items-center">
+//                                 <Settings className="w-5 h-5 mr-2 text-purple-600" />
+//                                 Configure Badge Format
+//                             </h3>
+//                             <p className="text-sm text-gray-600 mt-1">
+//                                 Select the fields to display on badges. Name, QR code, and badge code are always shown.
+//                             </p>
+//                         </div>
+//                         <div className="flex gap-2">
+//                             <button
+//                                 onClick={saveBadgeConfig}
+//                                 disabled={savingConfig || selectedFields.length === 0}
+//                                 className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed shadow-lg shadow-green-500/30 transition-all duration-200 flex items-center space-x-2 text-sm"
+//                             >
+//                                 {savingConfig ? (
+//                                     <>
+//                                         <Loader2 className="w-4 h-4 animate-spin" />
+//                                         <span>Saving...</span>
+//                                     </>
+//                                 ) : (
+//                                     <>
+//                                         <Save className="w-4 h-4" />
+//                                         <span>Save Format</span>
+//                                     </>
+//                                 )}
+//                             </button>
+//                             <button
+//                                 onClick={() => {
+//                                     setIsEditingConfig(false);
+//                                     if (badgeConfig) {
+//                                         setSelectedFields(badgeConfig.selectedFieldKeys);
+//                                     }
+//                                 }}
+//                                 className="px-4 py-2 bg-white text-gray-700 rounded-xl hover:bg-gray-50 border border-gray-300 shadow-lg transition-all duration-200 text-sm"
+//                             >
+//                                 Cancel
+//                             </button>
+//                         </div>
+//                     </div>
+
+//                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
+//                         {formFields.length > 0 ? (
+//                             formFields.map((field) => {
+//                                 const isChecked = selectedFields.includes(field.fieldKey);
+//                                 const hasValue = badges.some(badge => getFieldValue(badge, field.fieldKey));
+
+//                                 return (
+//                                     <label
+//                                         key={field.fieldKey}
+//                                         className={`flex items-center justify-between p-3 rounded-xl transition-all duration-150 cursor-pointer hover:bg-white/50 ${isChecked ? 'bg-white/70 border-purple-200' : 'bg-white/30'}`}
+//                                     >
+//                                         <div className="flex items-center space-x-3 flex-1 min-w-0">
+//                                             <div className="relative flex-shrink-0">
+//                                                 <input
+//                                                     type="checkbox"
+//                                                     checked={isChecked}
+//                                                     onChange={() => toggleField(field.fieldKey)}
+//                                                     className="sr-only"
+//                                                 />
+//                                                 <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-150 ${
+//                                                     isChecked
+//                                                         ? 'bg-purple-600 border-purple-600'
+//                                                         : 'bg-white border-gray-300'
+//                                                 }`}>
+//                                                     {isChecked && <Check className="w-3.5 h-3.5 text-white" />}
+//                                                 </div>
+//                                             </div>
+//                                             <div className="flex-1 min-w-0">
+//                                                 <p className={`text-sm font-medium truncate ${hasValue ? 'text-gray-700' : 'text-gray-400'}`}>
+//                                                     {field.label}
+//                                                 </p>
+//                                                 {field.required && (
+//                                                     <span className="text-xs text-red-500">Required</span>
+//                                                 )}
+//                                             </div>
+//                                         </div>
+//                                         {!hasValue && (
+//                                             <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full flex-shrink-0">
+//                                                 no data
+//                                             </span>
+//                                         )}
+//                                     </label>
+//                                 );
+//                             })
+//                         ) : (
+//                             <div className="col-span-full text-center py-8 bg-white/50 rounded-xl">
+//                                 <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+//                                     <span className="text-2xl">📋</span>
+//                                 </div>
+//                                 <p className="text-sm text-gray-500">No form fields available</p>
+//                                 <p className="text-xs text-gray-400 mt-1">Add fields to the event form first</p>
+//                             </div>
+//                         )}
+//                     </div>
+//                 </div>
+//             )}
+
+//             {/* Badge Grid - Responsive Cards */}
+//             {badges.length === 0 ? (
+//                 <div className="text-center py-12 sm:py-16 md:py-20">
+//                     <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+//                         <BadgeIcon className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-gray-400" />
+//                     </div>
+//                     <p className="text-gray-900 text-lg sm:text-xl font-semibold mb-2">No badges found</p>
+//                     <p className="text-gray-500 text-sm sm:text-base">There are no badges available to preview at this time.</p>
+//                 </div>
+//             ) : (
+//                 <div className={`grid ${isSingleBadge 
+//                     ? 'grid-cols-1 justify-items-center' 
+//                     : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'} gap-4 sm:gap-5 md:gap-6 max-h-[70vh] overflow-y-auto p-1 sm:p-2 custom-scrollbar`}>
+//                     {badges.map((badge) => {
+//                         const badgeId = badge.entryId || badge.registrationId;
+//                         return (
+//                             <div
+//                                 key={badgeId}
+//                                 className="group relative bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 overflow-hidden w-full"
+//                                 style={{
+//                                     maxWidth: isSingleBadge ? "400px" : "100%",
+//                                     margin: "0 auto"
+//                                 }}
+//                             >
+//                                 {/* Decorative gradient bar */}
+//                                 <div className="absolute top-0 left-0 right-0 h-1.5 sm:h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
+
+//                                 <div className="p-4 sm:p-5 md:p-6">
+//                                     {/* Name with gradient text - Responsive */}
+//                                     <div className="text-center mb-3 sm:mb-4">
+//                                         <h4 className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent truncate">
+//                                             {getDisplayName(badge)}
+//                                         </h4>
+//                                     </div>
+
+//                                     {/* Selected Fields from Config - ONLY VALUES, NO LABELS */}
+//                                     {selectedFields.length > 0 && (
+//                                         <div className="space-y-2 sm:space-y-1 mb-4 sm:mb-6">
+//                                             {selectedFields.map((fieldKey) => {
+//                                                 const value = getFieldValue(badge, fieldKey);
+//                                                 if (!value) return null;
+
+//                                                 return (
+//                                                     <div key={fieldKey} className="text-center">
+//                                                         <p className="text-sm sm:text-base font-semibold text-gray-800 truncate px-2">
+//                                                             {String(value)}
+//                                                         </p>
+//                                                     </div>
+//                                                 );
+//                                             })}
+//                                         </div>
+//                                     )}
+
+//                                     {/* QR Code Section - Responsive sizing */}
+//                                     <div className="flex flex-col items-center">
+//                                         <div className="relative">
+//                                             <div className="absolute inset-0 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-2xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity duration-300"></div>
+//                                             <div className="relative bg-white p-2 sm:p-3 rounded-2xl border border-gray-100 shadow-inner">
+//                                                 {qrImages[badgeId] ? (
+//                                                     <img
+//                                                         src={qrImages[badgeId]}
+//                                                         alt={`QR Code for ${getDisplayName(badge)}`}
+//                                                         className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 object-contain"
+//                                                     />
+//                                                 ) : (
+//                                                     <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center">
+//                                                         {failedQrs[badgeId] ? (
+//                                                             <QrCode className="w-8 h-8 sm:w-10 sm:h-10 text-gray-400" />
+//                                                         ) : (
+//                                                             <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin text-blue-600" />
+//                                                         )}
+//                                                     </div>
+//                                                 )}
+//                                             </div>
+//                                         </div>
+
+//                                         {/* Badge Code - Responsive */}
+//                                         <div className="mt-3 sm:mt-4 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full shadow-inner">
+//                                             <p className="text-xs sm:text-sm font-mono font-bold text-gray-800 truncate max-w-[150px] sm:max-w-[180px]">
+//                                                 {badge.badgeCode || badge.badgeId || `BDG-${badgeId}`}
+//                                             </p>
+//                                         </div>
+
+//                                         {failedQrs[badgeId] && (
+//                                             <button
+//                                                 onClick={() => retryLoadQR(badgeId)}
+//                                                 className="mt-2 sm:mt-3 text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full transition-colors duration-200 font-medium"
+//                                             >
+//                                                 Retry Loading QR
+//                                             </button>
+//                                         )}
+//                                     </div>
+//                                 </div>
+//                             </div>
+//                         );
+//                     })}
+//                 </div>
+//             )}
+
+//             {/* Custom Scrollbar Styles */}
+//             <style jsx>{`
+//                 .custom-scrollbar::-webkit-scrollbar {
+//                     width: 4px;
+//                     height: 4px;
+//                 }
+//                 .custom-scrollbar::-webkit-scrollbar-track {
+//                     background: #f1f1f1;
+//                     border-radius: 10px;
+//                 }
+//                 .custom-scrollbar::-webkit-scrollbar-thumb {
+//                     background: #cbd5e0;
+//                     border-radius: 10px;
+//                 }
+//                 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+//                     background: #94a3b8;
+//                 }
+//                 @keyframes fade-in {
+//                     from { opacity: 0; }
+//                     to { opacity: 1; }
+//                 }
+//                 @keyframes slide-in-from-top-5 {
+//                     from { transform: translateY(-10px); opacity: 0; }
+//                     to { transform: translateY(0); opacity: 1; }
+//                 }
+//                 .animate-in {
+//                     animation: fade-in 0.2s ease-out, slide-in-from-top-5 0.3s ease-out;
+//                 }
+
+//                 /* Mobile dropdown positioning fix */
+//                 @media (max-width: 640px) {
+//                     .fixed.dropdown-mobile {
+//                         position: fixed;
+//                         left: 1rem;
+//                         right: 1rem;
+//                         width: auto;
+//                         max-width: none;
+//                     }
+//                 }
+//             `}</style>
+//         </div>
+//     );
+// };
+
+// export default PreviewBadge;
+
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import axiosInstance from "../../../helper/AxiosInstance";
 import jsPDF from "jspdf";
 import QRCode from "qrcode";
-import { 
-    Loader2, 
-    Download, 
-    X, 
-    ChevronDown, 
-    User, 
-    Mail, 
-    Phone, 
-    QrCode, 
-    Badge as BadgeIcon, 
-    Check, 
+import {
+    Loader2,
+    Download,
+    X,
+    ChevronDown,
+    User,
+    Mail,
+    Phone,
+    QrCode,
+    Badge as BadgeIcon,
+    Check,
     Layers,
     Save,
     Edit,
-    Settings
+    Settings,
+    Ruler
 } from "lucide-react";
 
 const PreviewBadge = ({
@@ -36,7 +890,7 @@ const PreviewBadge = ({
     const [qrImages, setQrImages] = useState({});
     const [failedQrs, setFailedQrs] = useState({});
     const [allBadgesList, setAllBadgesList] = useState([]);
-    
+
     // Badge configuration states
     const [formFields, setFormFields] = useState([]);
     const [badgeConfig, setBadgeConfig] = useState(null);
@@ -45,6 +899,24 @@ const PreviewBadge = ({
     const [savingConfig, setSavingConfig] = useState(false);
     const [openDropdown, setOpenDropdown] = useState(false);
     const [activeTab, setActiveTab] = useState('grid');
+
+    // Size configuration states with minimum constraints
+    const MIN_BADGE_WIDTH_CM = 5; // 5cm minimum
+    const MIN_BADGE_HEIGHT_CM = 7; // 7cm minimum
+    const MIN_BADGE_WIDTH_MM = 50; // 50mm minimum
+    const MIN_BADGE_HEIGHT_MM = 70; // 70mm minimum
+
+    const [sizeConfig, setSizeConfig] = useState({
+        inner: {
+            height: 10,
+            width: 7,
+            unit: "cm",
+            position: "center"
+        }
+    });
+    const [tempSizeConfig, setTempSizeConfig] = useState(null);
+    const [configError, setConfigError] = useState("");
+    const [sizeError, setSizeError] = useState("");
 
     const dropdownRef = useRef(null);
 
@@ -73,14 +945,11 @@ const PreviewBadge = ({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Fetch single badge using the new endpoint: /events/{eventId}/badges/by-registration?registrationId={registrationId}
     const fetchSingleBadgeByRegistration = async () => {
         try {
             setLoading(true);
             setError("");
-            
-            console.log(`Fetching badge for registration ID: ${selectedRegistrationId}`);
-            
+
             const response = await axiosInstance.get(
                 `/events/${eventId}/badges/by-registration`,
                 {
@@ -90,21 +959,17 @@ const PreviewBadge = ({
                 }
             );
 
-            console.log("Single badge response:", response.data);
-
             if (response.data?.status === "success" && response.data?.data) {
                 const badgeData = response.data.data;
                 setSingleBadge(badgeData);
                 setBadges([badgeData]);
                 await loadQRImage(badgeData);
             } else {
-                // If the new endpoint fails, fall back to the old method
                 console.warn("New endpoint failed, falling back to exportAll");
                 await fetchAllBadgesFirst();
             }
         } catch (err) {
             console.error("Error fetching single badge:", err);
-            // Try fallback method
             try {
                 await fetchAllBadgesFirst();
             } catch (fallbackErr) {
@@ -115,7 +980,6 @@ const PreviewBadge = ({
         }
     };
 
-    // Fallback method: fetch all badges and filter
     const fetchAllBadgesFirst = async () => {
         try {
             const response = await axiosInstance.get(`/events/${eventId}/badges/exportAll`);
@@ -131,7 +995,6 @@ const PreviewBadge = ({
 
             setAllBadgesList(badgesData);
 
-            // Try to find badge by entryId (registrationId)
             const foundBadge = badgesData.find(badge => badge.entryId === selectedRegistrationId);
 
             if (foundBadge) {
@@ -147,15 +1010,12 @@ const PreviewBadge = ({
         }
     };
 
-    // Fetch all badges (for bulk preview)
     const fetchAllBadges = async () => {
         try {
             setLoading(true);
             setError("");
 
-            // First try to get badges using the new method if there are selected registrations
             if (selectedRegistrations && selectedRegistrations.length > 0) {
-                // For multiple badges, fetch each one individually
                 const badgePromises = selectedRegistrations.map(async (regId) => {
                     try {
                         const response = await axiosInstance.get(
@@ -174,7 +1034,7 @@ const PreviewBadge = ({
 
                 const badgeResults = await Promise.all(badgePromises);
                 const validBadges = badgeResults.filter(b => b !== null);
-                
+
                 if (validBadges.length > 0) {
                     setBadges(validBadges);
                     for (const badge of validBadges) {
@@ -185,7 +1045,6 @@ const PreviewBadge = ({
                 }
             }
 
-            // Fallback to exportAll if no specific registrations or if the new method failed
             const response = await axiosInstance.get(`/events/${eventId}/badges/exportAll`);
 
             let badgesData = [];
@@ -221,80 +1080,211 @@ const PreviewBadge = ({
         }
     };
 
-    // Fetch form fields from the event
     const fetchFormFields = async () => {
         try {
             const response = await axiosInstance.get(`/events/${eventId}/form-fields`);
+            let fields = [];
             if (Array.isArray(response.data)) {
-                setFormFields(response.data);
+                fields = response.data;
             } else if (response.data?.data && Array.isArray(response.data.data)) {
-                setFormFields(response.data.data);
+                fields = response.data.data;
             }
+            setFormFields(fields);
+            console.log("Available form fields:", fields.map(f => f.fieldKey));
         } catch (err) {
             console.error("Error fetching form fields:", err);
         }
     };
 
-    // Fetch badge configuration
     const fetchBadgeConfig = async () => {
         try {
             const response = await axiosInstance.get(`/events/${eventId}/config`);
+            console.log("Badge config response:", response.data);
             if (response.data?.status === "success" && response.data?.data) {
                 setBadgeConfig(response.data.data);
                 if (response.data.data.selectedFieldKeys) {
-                    setSelectedFields(response.data.data.selectedFieldKeys);
+                    console.log("Loaded selected fields:", response.data.data.selectedFieldKeys);
+                    const validFieldKeys = response.data.data.selectedFieldKeys.filter(key =>
+                        formFields.some(field => field.fieldKey === key)
+                    );
+                    console.log("Valid field keys:", validFieldKeys);
+                    setSelectedFields(validFieldKeys);
                 }
             }
         } catch (err) {
             console.error("Error fetching badge config:", err);
-            if (err.response?.status !== 404) {
-                console.error("Unexpected error:", err);
-            }
         }
     };
 
-    // Save badge configuration
+    const validateSizeConfig = (config) => {
+        if (!config || !config.inner) return sizeConfig;
+
+        let width = config.inner.width;
+        let height = config.inner.height;
+        let unit = config.inner.unit;
+
+        if (unit === "cm") {
+            if (width < MIN_BADGE_WIDTH_CM) width = MIN_BADGE_WIDTH_CM;
+            if (height < MIN_BADGE_HEIGHT_CM) height = MIN_BADGE_HEIGHT_CM;
+        } else if (unit === "mm") {
+            if (width < MIN_BADGE_WIDTH_MM) width = MIN_BADGE_WIDTH_MM;
+            if (height < MIN_BADGE_HEIGHT_MM) height = MIN_BADGE_HEIGHT_MM;
+        }
+
+        return {
+            ...config,
+            inner: {
+                ...config.inner,
+                width,
+                height
+            }
+        };
+    };
+
     const saveBadgeConfig = async () => {
         if (selectedFields.length === 0) {
             alert("Please select at least one field for the badge");
             return;
         }
 
+        const validFieldKeys = selectedFields.filter(key =>
+            formFields.some(field => field.fieldKey === key)
+        );
+
+        if (validFieldKeys.length !== selectedFields.length) {
+            const invalidKeys = selectedFields.filter(key =>
+                !formFields.some(field => field.fieldKey === key)
+            );
+            console.error("Invalid field keys detected:", invalidKeys);
+            setConfigError(`Invalid fields: ${invalidKeys.join(", ")}. Please refresh and try again.`);
+            return;
+        }
+
         setSavingConfig(true);
+        setConfigError("");
+        setSizeError("");
+
         try {
-            const response = await axiosInstance.post(`/events/${eventId}/config`, {
-                selectedFieldKeys: selectedFields
-            });
-            
+            // Validate size before saving
+            const sizeToSave = tempSizeConfig || sizeConfig;
+            let width = sizeToSave.inner.width;
+            let height = sizeToSave.inner.height;
+            let unit = sizeToSave.inner.unit;
+
+            if (unit === "cm") {
+                if (width < MIN_BADGE_WIDTH_CM || height < MIN_BADGE_HEIGHT_CM) {
+                    setSizeError(`Minimum badge size is ${MIN_BADGE_WIDTH_CM}x${MIN_BADGE_HEIGHT_CM}cm`);
+                    alert(`Badge size too small. Minimum size is ${MIN_BADGE_WIDTH_CM}x${MIN_BADGE_HEIGHT_CM}cm`);
+                    return;
+                }
+            } else if (unit === "mm") {
+                if (width < MIN_BADGE_WIDTH_MM || height < MIN_BADGE_HEIGHT_MM) {
+                    setSizeError(`Minimum badge size is ${MIN_BADGE_WIDTH_MM}x${MIN_BADGE_HEIGHT_MM}mm`);
+                    alert(`Badge size too small. Minimum size is ${MIN_BADGE_WIDTH_MM}x${MIN_BADGE_HEIGHT_MM}mm`);
+                    return;
+                }
+            }
+
+            const configData = {
+                selectedFieldKeys: validFieldKeys,
+                sizeConfig: sizeToSave
+            };
+
+            console.log("Saving config payload:", JSON.stringify(configData, null, 2));
+
+            const response = await axiosInstance.post(`/events/${eventId}/config`, configData);
+
             if (response.data?.status === "success") {
-                setBadgeConfig({ selectedFieldKeys: selectedFields });
+                setBadgeConfig({
+                    selectedFieldKeys: validFieldKeys,
+                    sizeConfig: sizeToSave
+                });
+                setSizeConfig(sizeToSave);
                 setIsEditingConfig(false);
-                alert("Badge format saved successfully!");
+                alert("Badge configuration saved successfully!");
+            } else {
+                throw new Error(response.data?.message || "Failed to save configuration");
             }
         } catch (err) {
             console.error("Error saving badge config:", err);
-            alert("Failed to save badge format. Please try again.");
+            const errorMessage = err.response?.data?.message || err.message || "Failed to save badge format. Please try again.";
+            setConfigError(errorMessage);
+            alert(errorMessage);
         } finally {
             setSavingConfig(false);
         }
     };
 
-    // Get field value from badge (checks both root and responses)
     const getFieldValue = (badge, fieldKey) => {
-        // Check if it's a default field from root object
-        if (fieldKey === "email") return badge.email || badge.responses?.email || "";
-        if (fieldKey === "phone" || fieldKey === "phone_number") {
-            return badge.phone || badge.responses?.phone || badge.responses?.phone_number || "";
+        // Comprehensive search for field value
+        let value = "";
+
+        // Log the badge structure for debugging (remove in production)
+        console.log(`Searching for field "${fieldKey}" in badge:`, {
+            hasResponses: !!badge.responses,
+            responseKeys: badge.responses ? Object.keys(badge.responses) : [],
+            directKeys: Object.keys(badge)
+        });
+
+        // Try multiple locations
+        if (badge.responses && badge.responses[fieldKey]) {
+            value = badge.responses[fieldKey];
         }
-        if (fieldKey === "name") return badge.responses?.name || badge.name || "";
-        
-        // For other fields, check responses
-        return badge.responses?.[fieldKey] || "";
+        else if (badge[fieldKey]) {
+            value = badge[fieldKey];
+        }
+        else if (badge.registrationData && badge.registrationData[fieldKey]) {
+            value = badge.registrationData[fieldKey];
+        }
+        else if (badge.attendee && badge.attendee[fieldKey]) {
+            value = badge.attendee[fieldKey];
+        }
+
+        // Handle common field name variations
+        if (!value) {
+            switch (fieldKey) {
+                case 'email':
+                    value = badge.email || badge.responses?.email || badge.registrationData?.email || "";
+                    break;
+                case 'phone':
+                case 'phone_number':
+                case 'mobile':
+                    value = badge.phone || badge.mobile || badge.responses?.phone || badge.responses?.mobile || badge.responses?.phone_number || "";
+                    break;
+                case 'name':
+                    value = badge.name || badge.responses?.name || badge.attendee?.name || "";
+                    break;
+                case 'location':
+                case 'city':
+                case 'address':
+                    value = badge.location || badge.city || badge.address || badge.responses?.location || badge.responses?.city || "";
+                    break;
+                default:
+                    // Try case-insensitive search
+                    const lowerKey = fieldKey.toLowerCase();
+                    for (const [key, val] of Object.entries(badge)) {
+                        if (key.toLowerCase() === lowerKey && val) {
+                            value = val;
+                            break;
+                        }
+                    }
+                    if (!value && badge.responses) {
+                        for (const [key, val] of Object.entries(badge.responses)) {
+                            if (key.toLowerCase() === lowerKey && val) {
+                                value = val;
+                                break;
+                            }
+                        }
+                    }
+            }
+        }
+
+        console.log(`Field "${fieldKey}" value:`, value);
+        return value;
     };
 
-    // Get display name from responses or root object
     const getDisplayName = (badge) => {
-        return badge.responses?.name || badge.name || "Attendee";
+        return badge.responses?.name || badge.name || badge.attendee?.name || "Attendee";
     };
 
     const generateQRFromBadge = async (badge) => {
@@ -306,11 +1296,11 @@ const PreviewBadge = ({
                 entryId: badge.entryId || badge.registrationId,
                 event: badge.eventName || "Event"
             };
-     
+
             const qrPayload = JSON.stringify(payloadMap);
-        
+
             const qrBase64 = await QRCode.toDataURL(qrPayload, {
-                width: 300, 
+                width: 300,
                 margin: 1,
                 errorCorrectionLevel: 'H',
                 color: {
@@ -321,12 +1311,11 @@ const PreviewBadge = ({
 
             return qrBase64;
         } catch (err) {
-            console.error(`Failed to generate QR for ${badge.entryId || badge.registrationId}:`, err);
+            console.error(`Failed to generate QR:`, err);
             return null;
         }
     };
 
-    // Load or generate QR image
     const loadQRImage = async (badge) => {
         const badgeId = badge.entryId || badge.registrationId;
         try {
@@ -359,7 +1348,7 @@ const PreviewBadge = ({
                 }
             }
         } catch (err) {
-            console.error(`Error in loadQRImage for ${badgeId}:`, err);
+            console.error(`Error in loadQRImage:`, err);
             setFailedQrs(prev => ({ ...prev, [badgeId]: true }));
         }
     };
@@ -381,48 +1370,202 @@ const PreviewBadge = ({
         });
     };
 
-    const handleDownloadPDF = async () => {
-        if (!badges.length) {
-            alert("No badges to download");
-            return;
+    const convertToMM = (value, unit) => {
+        if (unit === "cm") {
+            return value * 10;
+        }
+        return value;
+    };
+
+    const handleSizeChange = (dimension, value) => {
+        let numValue = parseFloat(value);
+        if (isNaN(numValue)) numValue = 0;
+
+        const unit = tempSizeConfig?.inner?.unit || "cm";
+
+        // Apply minimum constraints
+        if (unit === "cm") {
+            if (dimension === "width" && numValue < MIN_BADGE_WIDTH_CM) {
+                setSizeError(`Minimum width is ${MIN_BADGE_WIDTH_CM}cm`);
+                numValue = MIN_BADGE_WIDTH_CM;
+            } else if (dimension === "height" && numValue < MIN_BADGE_HEIGHT_CM) {
+                setSizeError(`Minimum height is ${MIN_BADGE_HEIGHT_CM}cm`);
+                numValue = MIN_BADGE_HEIGHT_CM;
+            } else {
+                setSizeError("");
+            }
+        } else if (unit === "mm") {
+            if (dimension === "width" && numValue < MIN_BADGE_WIDTH_MM) {
+                setSizeError(`Minimum width is ${MIN_BADGE_WIDTH_MM}mm`);
+                numValue = MIN_BADGE_WIDTH_MM;
+            } else if (dimension === "height" && numValue < MIN_BADGE_HEIGHT_MM) {
+                setSizeError(`Minimum height is ${MIN_BADGE_HEIGHT_MM}mm`);
+                numValue = MIN_BADGE_HEIGHT_MM;
+            } else {
+                setSizeError("");
+            }
         }
 
-        setDownloading(true);
+        setTempSizeConfig(prev => ({
+            ...prev,
+            inner: {
+                ...prev.inner,
+                [dimension]: numValue
+            }
+        }));
+    };
 
-        try {
-            const pdf = new jsPDF({
-                orientation: "portrait",
-                unit: "mm",
-                format: [76, 102],
-            });
+    const handleUnitChange = (unit) => {
+        let width = tempSizeConfig?.inner?.width || 7;
+        let height = tempSizeConfig?.inner?.height || 10;
 
-            for (let i = 0; i < badges.length; i++) {
-                const badge = badges[i];
+        // Convert values when changing units
+        if (unit === "cm" && tempSizeConfig?.inner?.unit === "mm") {
+            width = width / 10;
+            height = height / 10;
+        } else if (unit === "mm" && tempSizeConfig?.inner?.unit === "cm") {
+            width = width * 10;
+            height = height * 10;
+        }
 
-                if (i !== 0) pdf.addPage();
+        // Apply minimum constraints for the new unit
+        if (unit === "cm") {
+            if (width < MIN_BADGE_WIDTH_CM) width = MIN_BADGE_WIDTH_CM;
+            if (height < MIN_BADGE_HEIGHT_CM) height = MIN_BADGE_HEIGHT_CM;
+        } else if (unit === "mm") {
+            if (width < MIN_BADGE_WIDTH_MM) width = MIN_BADGE_WIDTH_MM;
+            if (height < MIN_BADGE_HEIGHT_MM) height = MIN_BADGE_HEIGHT_MM;
+        }
 
-                const centerX = 38;
+        setTempSizeConfig(prev => ({
+            ...prev,
+            inner: {
+                ...prev.inner,
+                unit: unit,
+                width: width,
+                height: height
+            }
+        }));
+        setSizeError("");
+    };
 
-                // Name - Always show
-                const displayName = getDisplayName(badge);
-                pdf.setFontSize(16);
-                pdf.setFont("helvetica", "bold");
-                pdf.text(displayName, centerX, 20, { align: "center" });
+    const handlePositionChange = (position) => {
+        setTempSizeConfig(prev => ({
+            ...prev,
+            inner: {
+                ...prev.inner,
+                position: position
+            }
+        }));
+    };
 
-                // Selected field values from config - No labels, just values
-                pdf.setFontSize(9);
+    const handleDownloadPDF = async () => {
+    if (!badges.length) {
+        alert("No badges to download");
+        return;
+    }
+
+    setDownloading(true);
+
+    try {
+        const currentSizeConfig = tempSizeConfig || sizeConfig;
+        let widthMM = convertToMM(currentSizeConfig.inner.width, currentSizeConfig.inner.unit);
+        let heightMM = convertToMM(currentSizeConfig.inner.height, currentSizeConfig.inner.unit);
+        
+        // Set minimum dimensions
+        const MIN_WIDTH = 50; // mm
+        const MIN_HEIGHT = 70; // mm
+        
+        if (widthMM < MIN_WIDTH || heightMM < MIN_HEIGHT) {
+            widthMM = MIN_WIDTH;
+            heightMM = MIN_HEIGHT;
+        }
+        
+        console.log("PDF Dimensions:", widthMM, "x", heightMM);
+        
+        const pdf = new jsPDF({
+            orientation: widthMM > heightMM ? "landscape" : "portrait",
+            unit: "mm",
+            format: [widthMM, heightMM],
+        });
+
+        // PROPORTIONAL SCALING - All values are percentages of page dimensions
+        const scale = {
+            // Margins (percentage of page)
+            marginTop: heightMM * 0.08,      // 8% from top
+            marginBottom: heightMM * 0.08,   // 8% from bottom
+            marginLeft: widthMM * 0.08,      // 8% from left
+            marginRight: widthMM * 0.08,     // 8% from right
+            
+            // Font sizes (scale with page height)
+            nameFontSize: Math.max(10, Math.min(18, heightMM * 0.16)),
+            fieldFontSize: Math.max(8, Math.min(12, heightMM * 0.12)),
+            codeFontSize: Math.max(6, Math.min(9, heightMM * 0.09)),
+            
+            // QR code size (scale with page dimensions)
+            qrSize: Math.max(18, Math.min(32, Math.min(widthMM, heightMM) * 0.32)),
+            
+            // Spacing (scale with page height)
+            nameSpacing: heightMM * 0.04,
+            fieldSpacing: heightMM * 0.03,
+            sectionSpacing: heightMM * 0.02,
+        };
+        
+        const availableWidth = widthMM - scale.marginLeft - scale.marginRight;
+        const centerX = widthMM / 2;
+
+        for (let i = 0; i < badges.length; i++) {
+            const badge = badges[i];
+            
+            if (i !== 0) pdf.addPage();
+
+            let currentY = scale.marginTop;
+            
+            // 1. Draw NAME (centered, scaled font)
+            const displayName = getDisplayName(badge);
+            pdf.setFontSize(scale.nameFontSize);
+            pdf.setFont("helvetica", "bold");
+            const nameLines = pdf.splitTextToSize(displayName, availableWidth);
+            pdf.text(nameLines, centerX, currentY, { align: "center" });
+            currentY += (nameLines.length * (scale.nameFontSize * 0.35)) + scale.nameSpacing;
+            
+            // 2. Draw SELECTED FIELD VALUES (scaled)
+            if (selectedFields && selectedFields.length > 0) {
+                pdf.setFontSize(scale.fieldFontSize);
                 pdf.setFont("helvetica", "normal");
-                let y = 28;
-
-                selectedFields.forEach((fieldKey) => {
-                    const value = getFieldValue(badge, fieldKey);
-                    if (!value) return;
-                    pdf.text(String(value), centerX, y, { align: "center" });
-                    y += 6;
-                });
-
-                // Generate QR Code for PDF
-                try {
+                
+                let fieldsDrawn = 0;
+                for (const fieldKey of selectedFields) {
+                    let value = getFieldValue(badge, fieldKey);
+                    
+                    if (value && value.toString().trim() !== "") {
+                        // Check if we have enough space for QR code
+                        const spaceNeeded = scale.qrSize + scale.sectionSpacing * 2;
+                        if (currentY + spaceNeeded > heightMM - scale.marginBottom) {
+                            console.log("Skipping field to reserve space for QR");
+                            break;
+                        }
+                        
+                        const fieldLines = pdf.splitTextToSize(String(value), availableWidth);
+                        pdf.text(fieldLines, centerX, currentY, { align: "center" });
+                        currentY += (fieldLines.length * (scale.fieldFontSize * 0.3)) + scale.fieldSpacing;
+                        fieldsDrawn++;
+                    }
+                }
+                
+                if (fieldsDrawn > 0) {
+                    currentY += scale.sectionSpacing;
+                }
+            }
+            
+            // 3. Draw QR CODE (centered, scaled size)
+            try {
+                // Calculate QR position (centered vertically between content and bottom)
+                const qrY = currentY;
+                const qrX = (widthMM - scale.qrSize) / 2;
+                
+                // Check if QR fits
+                if (qrY + scale.qrSize + scale.sectionSpacing <= heightMM - scale.marginBottom) {
                     const payloadMap = {
                         name: displayName,
                         email: badge.email || badge.responses?.email || "",
@@ -430,50 +1573,75 @@ const PreviewBadge = ({
                         entryId: badge.entryId || badge.registrationId,
                         event: badge.eventName || "Event"
                     };
-
-                    const qrPayload = JSON.stringify(payloadMap);
                     
+                    const qrPayload = JSON.stringify(payloadMap);
                     const qrBase64 = await QRCode.toDataURL(qrPayload, {
                         width: 300,
                         margin: 1,
                         errorCorrectionLevel: 'H',
-                        color: {
-                            dark: '#000000',
-                            light: '#ffffff'
-                        }
+                        color: { dark: '#000000', light: '#ffffff' }
                     });
-
-                    const qrSize = 40;
-                    const qrX = (76 - qrSize) / 2;
-                    const qrY = 45;
-
-                    pdf.addImage(qrBase64, "PNG", qrX, qrY, qrSize, qrSize);
-                } catch (err) {
-                    console.error("QR generation failed:", err);
+                    
+                    pdf.addImage(qrBase64, "PNG", qrX, qrY, scale.qrSize, scale.qrSize);
+                    currentY = qrY + scale.qrSize + scale.sectionSpacing;
+                } else {
+                    console.log("Not enough space for QR code");
                 }
-
-                // Badge Code
-                pdf.setFontSize(7);
+            } catch (err) {
+                console.error("QR generation failed:", err);
+            }
+            
+            // 4. Draw BADGE CODE (at bottom, scaled)
+            const badgeCode = badge.badgeCode || badge.badgeId || `BDG-${badge.entryId || badge.registrationId}`;
+            if (badgeCode) {
+                pdf.setFontSize(scale.codeFontSize);
                 pdf.setFont("helvetica", "bold");
-                pdf.text(badge.badgeCode || badge.badgeId || `BDG-${badge.entryId || badge.registrationId}`, centerX, 92, { align: "center" });
+                const badgeCodeY = heightMM - scale.marginBottom;
+                
+                if (badgeCodeY > currentY + 2) {
+                    const codeLines = pdf.splitTextToSize(badgeCode, availableWidth);
+                    pdf.text(codeLines, centerX, badgeCodeY, { align: "center" });
+                }
             }
-
-            let fileName;
-            if (isSingleBadge) {
-                fileName = `${getDisplayName(badges[0])}_${badges[0]?.badgeCode || badges[0]?.badgeId || 'Badge'}.pdf`;
-            } else {
-                fileName = selectedRegistrations?.length > 0
-                    ? `Selected_Badges_Event_${eventId}.pdf`
-                    : `All_Badges_Event_${eventId}.pdf`;
-            }
-
-            pdf.save(fileName);
-        } catch (err) {
-            console.error("PDF generation failed:", err);
-            alert("Failed to generate PDF. Please try again.");
-        } finally {
-            setDownloading(false);
         }
+
+        let fileName;
+        if (isSingleBadge) {
+            fileName = `${getDisplayName(badges[0])}_${badges[0]?.badgeCode || badges[0]?.badgeId || 'Badge'}.pdf`;
+        } else {
+            fileName = selectedRegistrations?.length > 0
+                ? `Selected_Badges_Event_${eventId}.pdf`
+                : `All_Badges_Event_${eventId}.pdf`;
+        }
+
+        pdf.save(fileName);
+        console.log("PDF generated successfully with scaling");
+    } catch (err) {
+        console.error("PDF generation failed:", err);
+        alert("Failed to generate PDF. Please try again.");
+    } finally {
+        setDownloading(false);
+    }
+};
+
+    const getPreviewBadgeStyle = () => {
+        const currentConfig = tempSizeConfig || sizeConfig;
+        let width = currentConfig.inner.width;
+        const unit = currentConfig.inner.unit;
+
+        // Enforce minimum size for preview
+        if (unit === "cm") {
+            if (width < MIN_BADGE_WIDTH_CM) width = MIN_BADGE_WIDTH_CM;
+        } else if (unit === "mm") {
+            if (width < MIN_BADGE_WIDTH_MM / 10) width = MIN_BADGE_WIDTH_MM / 10;
+        }
+
+        const toPx = unit === "cm" ? 37.8 : 3.78;
+        return {
+            width: `${width * toPx}px`,
+            minWidth: "200px",
+            maxWidth: "100%"
+        };
     };
 
     if (loading) {
@@ -523,7 +1691,7 @@ const PreviewBadge = ({
 
     return (
         <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 max-w-7xl mx-auto m-2 sm:m-4 border border-gray-100">
-            {/* Enhanced Header - Responsive */}
+            {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-start justify-between mb-6 sm:mb-8 pb-4 sm:pb-6 border-b border-gray-200/80">
                 <div className="flex flex-col sm:flex-row sm:items-start space-y-1 sm:space-y-0 sm:space-x-4">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
@@ -536,46 +1704,60 @@ const PreviewBadge = ({
                         <div className="flex flex-wrap items-center mt-2 gap-2">
                             <div className="px-2 sm:px-3 py-1 bg-blue-50 rounded-full text-blue-700 text-xs sm:text-sm font-medium flex items-center">
                                 <Layers className="w-3 h-3 mr-1 flex-shrink-0" />
-                                <span className="truncate max-w-[180px] sm:max-w-none">
+                                <span>
                                     {isSingleBadge
                                         ? `Badge for ${getDisplayName(singleBadge) || 'Attendee'}`
-                                        : `${badges.length} badge${badges.length !== 1 ? 's' : ''} ready for export`
+                                        : `${badges.length} badge${badges.length !== 1 ? 's' : ''} ready`
                                     }
                                 </span>
                             </div>
                             {badgeConfig && !isEditingConfig && (
                                 <div className="px-2 sm:px-3 py-1 bg-green-50 rounded-full text-green-700 text-xs sm:text-sm font-medium flex items-center">
                                     <Check className="w-3 h-3 mr-1" />
-                                    <span>Format: {selectedFields.length} field{selectedFields.length !== 1 ? 's' : ''}</span>
+                                    <span>{selectedFields.length} field{selectedFields.length !== 1 ? 's' : ''}</span>
+                                </div>
+                            )}
+                            {sizeConfig && !isEditingConfig && (
+                                <div className="px-2 sm:px-3 py-1 bg-purple-50 rounded-full text-purple-700 text-xs sm:text-sm font-medium flex items-center">
+                                    <Ruler className="w-3 h-3 mr-1" />
+                                    <span>{sizeConfig.inner.width}{sizeConfig.inner.unit} x {sizeConfig.inner.height}{sizeConfig.inner.unit}</span>
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* Action Buttons - Stack on mobile */}
+                {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 mt-4 lg:mt-0">
-                    {/* Badge Format Configuration Button */}
                     <button
-                        onClick={() => setIsEditingConfig(!isEditingConfig)}
+                        onClick={() => {
+                            setIsEditingConfig(!isEditingConfig);
+                            if (!isEditingConfig && badgeConfig) {
+                                setSelectedFields(badgeConfig.selectedFieldKeys);
+                                setTempSizeConfig(badgeConfig.sizeConfig || sizeConfig);
+                            } else if (!isEditingConfig && !badgeConfig) {
+                                setTempSizeConfig(sizeConfig);
+                            }
+                            setConfigError("");
+                            setSizeError("");
+                        }}
                         className="w-full sm:w-auto group px-4 sm:px-5 py-2.5 sm:py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 shadow-lg shadow-purple-500/30 transition-all duration-200 flex items-center justify-center space-x-2 text-sm sm:text-base"
                     >
                         {isEditingConfig ? (
                             <>
                                 <Settings className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
-                                <span className="font-medium">Editing Format</span>
+                                <span className="font-medium">Editing Configuration</span>
                             </>
                         ) : (
                             <>
                                 <Edit className="w-4 h-4" />
                                 <span className="font-medium">
-                                    {badgeConfig ? 'Edit Badge Format' : 'Configure Badge Format'}
+                                    {badgeConfig ? 'Edit Badge Configuration' : 'Configure Badge'}
                                 </span>
                             </>
                         )}
                     </button>
 
-                    {/* Download Button */}
                     <button
                         onClick={handleDownloadPDF}
                         disabled={downloading || badges.length === 0}
@@ -594,7 +1776,6 @@ const PreviewBadge = ({
                         )}
                     </button>
 
-                    {/* Close Button */}
                     <button
                         onClick={onClose}
                         className="absolute top-4 right-4 sm:relative sm:top-auto sm:right-auto p-2 sm:p-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all duration-200"
@@ -604,17 +1785,17 @@ const PreviewBadge = ({
                 </div>
             </div>
 
-            {/* Badge Format Configuration Panel */}
+            {/* Configuration Panel */}
             {isEditingConfig && (
                 <div className="mb-8 p-4 sm:p-6 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border border-purple-200/50">
                     <div className="flex items-start justify-between mb-4">
                         <div>
                             <h3 className="text-lg sm:text-xl font-semibold text-gray-800 flex items-center">
                                 <Settings className="w-5 h-5 mr-2 text-purple-600" />
-                                Configure Badge Format
+                                Configure Badge
                             </h3>
                             <p className="text-sm text-gray-600 mt-1">
-                                Select the fields to display on badges. Name, QR code, and badge code are always shown.
+                                Select fields to display and customize badge size
                             </p>
                         </div>
                         <div className="flex gap-2">
@@ -631,7 +1812,7 @@ const PreviewBadge = ({
                                 ) : (
                                     <>
                                         <Save className="w-4 h-4" />
-                                        <span>Save Format</span>
+                                        <span>Save Configuration</span>
                                     </>
                                 )}
                             </button>
@@ -640,7 +1821,12 @@ const PreviewBadge = ({
                                     setIsEditingConfig(false);
                                     if (badgeConfig) {
                                         setSelectedFields(badgeConfig.selectedFieldKeys);
+                                        setTempSizeConfig(badgeConfig.sizeConfig || sizeConfig);
+                                    } else {
+                                        setTempSizeConfig(sizeConfig);
                                     }
+                                    setConfigError("");
+                                    setSizeError("");
                                 }}
                                 className="px-4 py-2 bg-white text-gray-700 rounded-xl hover:bg-gray-50 border border-gray-300 shadow-lg transition-all duration-200 text-sm"
                             >
@@ -649,64 +1835,196 @@ const PreviewBadge = ({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
-                        {formFields.length > 0 ? (
-                            formFields.map((field) => {
-                                const isChecked = selectedFields.includes(field.fieldKey);
-                                const hasValue = badges.some(badge => getFieldValue(badge, field.fieldKey));
+                    {configError && (
+                        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <p className="text-sm text-red-600">{configError}</p>
+                        </div>
+                    )}
 
-                                return (
-                                    <label
-                                        key={field.fieldKey}
-                                        className={`flex items-center justify-between p-3 rounded-xl transition-all duration-150 cursor-pointer hover:bg-white/50 ${isChecked ? 'bg-white/70 border-purple-200' : 'bg-white/30'}`}
-                                    >
-                                        <div className="flex items-center space-x-3 flex-1 min-w-0">
-                                            <div className="relative flex-shrink-0">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isChecked}
-                                                    onChange={() => toggleField(field.fieldKey)}
-                                                    className="sr-only"
-                                                />
-                                                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-150 ${
-                                                    isChecked
-                                                        ? 'bg-purple-600 border-purple-600'
-                                                        : 'bg-white border-gray-300'
-                                                }`}>
-                                                    {isChecked && <Check className="w-3.5 h-3.5 text-white" />}
+                    {sizeError && (
+                        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <p className="text-sm text-yellow-700">{sizeError}</p>
+                        </div>
+                    )}
+
+                    {/* Two Column Layout */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+                        {/* Left Column - Form Fields */}
+                        <div>
+                            <h4 className="text-md font-semibold text-gray-800 mb-3 flex items-center">
+                                <User className="w-4 h-4 mr-2 text-purple-600" />
+                                Display Fields
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto p-2">
+                                {formFields.length > 0 ? (
+                                    formFields.map((field) => {
+                                        const isChecked = selectedFields.includes(field.fieldKey);
+                                        // Check if any badge has this field value
+                                        const hasValue = badges.some(badge => {
+                                            const value = getFieldValue(badge, field.fieldKey);
+                                            return value && value.toString().trim() !== "";
+                                        });
+
+                                        return (
+                                            <label
+                                                key={field.fieldKey}
+                                                className={`flex items-center justify-between p-3 rounded-xl transition-all duration-150 cursor-pointer hover:bg-white/50 ${isChecked ? 'bg-white/70 border-purple-200' : 'bg-white/30'}`}
+                                            >
+                                                <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                                    <div className="relative flex-shrink-0">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isChecked}
+                                                            onChange={() => toggleField(field.fieldKey)}
+                                                            className="sr-only"
+                                                        />
+                                                        <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-150 ${isChecked
+                                                            ? 'bg-purple-600 border-purple-600'
+                                                            : 'bg-white border-gray-300'
+                                                            }`}>
+                                                            {isChecked && <Check className="w-3.5 h-3.5 text-white" />}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`text-sm font-medium truncate ${hasValue ? 'text-gray-700' : 'text-gray-400'}`}>
+                                                            {field.label}
+                                                        </p>
+                                                        <p className="text-xs text-gray-400 truncate">{field.fieldKey}</p>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className={`text-sm font-medium truncate ${hasValue ? 'text-gray-700' : 'text-gray-400'}`}>
-                                                    {field.label}
-                                                </p>
-                                                {field.required && (
-                                                    <span className="text-xs text-red-500">Required</span>
+                                                {!hasValue && (
+                                                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full flex-shrink-0">
+                                                        no data
+                                                    </span>
                                                 )}
-                                            </div>
+                                            </label>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="col-span-full text-center py-8 bg-white/50 rounded-xl">
+                                        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                            <span className="text-2xl">📋</span>
                                         </div>
-                                        {!hasValue && (
-                                            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full flex-shrink-0">
-                                                no data
-                                            </span>
-                                        )}
-                                    </label>
-                                );
-                            })
-                        ) : (
-                            <div className="col-span-full text-center py-8 bg-white/50 rounded-xl">
-                                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <span className="text-2xl">📋</span>
-                                </div>
-                                <p className="text-sm text-gray-500">No form fields available</p>
-                                <p className="text-xs text-gray-400 mt-1">Add fields to the event form first</p>
+                                        <p className="text-sm text-gray-500">No form fields available</p>
+                                        <p className="text-xs text-gray-400 mt-1">Add fields to the event form first</p>
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        </div>
+
+                        {/* Right Column - Size Configuration */}
+                        <div>
+                            <h4 className="text-md font-semibold text-gray-800 mb-3 flex items-center">
+                                <Ruler className="w-4 h-4 mr-2 text-blue-600" />
+                                Badge Size & Layout
+                            </h4>
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Width
+                                        </label>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                step="0.5"
+                                                min={tempSizeConfig?.inner?.unit === "cm" ? MIN_BADGE_WIDTH_CM : MIN_BADGE_WIDTH_MM}
+                                                max="15"
+                                                value={tempSizeConfig?.inner?.width || 7}
+                                                onChange={(e) => handleSizeChange("width", e.target.value)}
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            />
+                                            <span className="text-gray-600">{tempSizeConfig?.inner?.unit || "cm"}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Height
+                                        </label>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                step="0.5"
+                                                min={tempSizeConfig?.inner?.unit === "cm" ? MIN_BADGE_HEIGHT_CM : MIN_BADGE_HEIGHT_MM}
+                                                max="20"
+                                                value={tempSizeConfig?.inner?.height || 10}
+                                                onChange={(e) => handleSizeChange("height", e.target.value)}
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            />
+                                            <span className="text-gray-600">{tempSizeConfig?.inner?.unit || "cm"}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Unit
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleUnitChange("cm")}
+                                            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${tempSizeConfig?.inner?.unit === "cm"
+                                                ? "bg-blue-600 text-white shadow-md"
+                                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                                }`}
+                                        >
+                                            Centimeters (cm)
+                                        </button>
+                                        <button
+                                            onClick={() => handleUnitChange("mm")}
+                                            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${tempSizeConfig?.inner?.unit === "mm"
+                                                ? "bg-blue-600 text-white shadow-md"
+                                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                                }`}
+                                        >
+                                            Millimeters (mm)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="pt-2">
+                                    <div className="bg-blue-50 p-3 rounded-lg">
+                                        <p className="text-xs text-blue-800">
+                                            💡 <span className="font-semibold">Standard Badge Sizes:</span>
+                                        </p>
+                                        <ul className="text-xs text-blue-800 mt-1 space-y-1">
+                                            <li>• <span className="font-semibold">CR80 (Standard):</span> 5.4 x 8.6 cm - Most common, fits in badge holders</li>
+                                            <li>• <span className="font-semibold">Small:</span> 5 x 7 cm - Compact, good for simple badges</li>
+                                            <li>• <span className="font-semibold">Large:</span> 7 x 10 cm - More space for content</li>
+                                        </ul>
+                                        <p className="text-xs text-blue-800 mt-2">
+                                            ⚠️ <span className="font-semibold">Minimum size:</span> 5 x 7 cm
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Preview of current size */}
+                    <div className="mt-6 pt-4 border-t border-purple-200">
+                        <h4 className="text-sm font-semibold text-gray-800 mb-3">Preview Size</h4>
+                        <div className="flex justify-center">
+                            <div className="bg-white rounded-lg shadow-lg p-4 border border-gray-200">
+                                <div
+                                    className="bg-gradient-to-br from-gray-50 to-white rounded-lg border-2 border-dashed border-blue-300 flex items-center justify-center"
+                                    style={getPreviewBadgeStyle()}
+                                >
+                                    <div className="text-center p-4">
+                                        <BadgeIcon className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+                                        <p className="text-xs text-gray-600">Preview</p>
+                                        <p className="text-xs text-gray-400 mt-1">
+                                            {tempSizeConfig?.inner?.width}{tempSizeConfig?.inner?.unit} x {tempSizeConfig?.inner?.height}{tempSizeConfig?.inner?.unit}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* Badge Grid - Responsive Cards */}
+            {/* Badge Grid */}
             {badges.length === 0 ? (
                 <div className="text-center py-12 sm:py-16 md:py-20">
                     <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
@@ -716,41 +2034,37 @@ const PreviewBadge = ({
                     <p className="text-gray-500 text-sm sm:text-base">There are no badges available to preview at this time.</p>
                 </div>
             ) : (
-                <div className={`grid ${isSingleBadge 
-                    ? 'grid-cols-1 justify-items-center' 
+                <div className={`grid ${isSingleBadge
+                    ? 'grid-cols-1 justify-items-center'
                     : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'} gap-4 sm:gap-5 md:gap-6 max-h-[70vh] overflow-y-auto p-1 sm:p-2 custom-scrollbar`}>
                     {badges.map((badge) => {
                         const badgeId = badge.entryId || badge.registrationId;
+                        const previewStyle = getPreviewBadgeStyle();
+
                         return (
                             <div
                                 key={badgeId}
-                                className="group relative bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 overflow-hidden w-full"
-                                style={{
-                                    maxWidth: isSingleBadge ? "400px" : "100%",
-                                    margin: "0 auto"
-                                }}
+                                className="group relative bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 overflow-hidden"
+                                style={previewStyle}
                             >
-                                {/* Decorative gradient bar */}
                                 <div className="absolute top-0 left-0 right-0 h-1.5 sm:h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
-                                
+
                                 <div className="p-4 sm:p-5 md:p-6">
-                                    {/* Name with gradient text - Responsive */}
                                     <div className="text-center mb-3 sm:mb-4">
-                                        <h4 className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent truncate">
+                                        <h4 className="text-sm sm:text-base md:text-lg font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent truncate">
                                             {getDisplayName(badge)}
                                         </h4>
                                     </div>
 
-                                    {/* Selected Fields from Config - ONLY VALUES, NO LABELS */}
                                     {selectedFields.length > 0 && (
-                                        <div className="space-y-2 sm:space-y-1 mb-4 sm:mb-6">
+                                        <div className="space-y-1 mb-3 sm:mb-4">
                                             {selectedFields.map((fieldKey) => {
                                                 const value = getFieldValue(badge, fieldKey);
-                                                if (!value) return null;
+                                                if (!value || value.toString().trim() === "") return null;
 
                                                 return (
                                                     <div key={fieldKey} className="text-center">
-                                                        <p className="text-sm sm:text-base font-semibold text-gray-800 truncate px-2">
+                                                        <p className="text-xs sm:text-sm font-semibold text-gray-800 truncate px-2">
                                                             {String(value)}
                                                         </p>
                                                     </div>
@@ -759,32 +2073,30 @@ const PreviewBadge = ({
                                         </div>
                                     )}
 
-                                    {/* QR Code Section - Responsive sizing */}
                                     <div className="flex flex-col items-center">
                                         <div className="relative">
                                             <div className="absolute inset-0 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-2xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity duration-300"></div>
-                                            <div className="relative bg-white p-2 sm:p-3 rounded-2xl border border-gray-100 shadow-inner">
+                                            <div className="relative bg-white p-2 rounded-2xl border border-gray-100 shadow-inner">
                                                 {qrImages[badgeId] ? (
                                                     <img
                                                         src={qrImages[badgeId]}
-                                                        alt={`QR Code for ${getDisplayName(badge)}`}
-                                                        className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 object-contain"
+                                                        alt={`QR Code`}
+                                                        className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-contain"
                                                     />
                                                 ) : (
-                                                    <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center">
+                                                    <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center">
                                                         {failedQrs[badgeId] ? (
-                                                            <QrCode className="w-8 h-8 sm:w-10 sm:h-10 text-gray-400" />
+                                                            <QrCode className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
                                                         ) : (
-                                                            <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin text-blue-600" />
+                                                            <Loader2 className="w-4 h-4 sm:w-6 sm:h-6 animate-spin text-blue-600" />
                                                         )}
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
 
-                                        {/* Badge Code - Responsive */}
-                                        <div className="mt-3 sm:mt-4 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full shadow-inner">
-                                            <p className="text-xs sm:text-sm font-mono font-bold text-gray-800 truncate max-w-[150px] sm:max-w-[180px]">
+                                        <div className="mt-2 sm:mt-3 px-2 sm:px-3 py-1 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full shadow-inner">
+                                            <p className="text-[10px] sm:text-xs font-mono font-bold text-gray-800 truncate max-w-[120px] sm:max-w-[150px]">
                                                 {badge.badgeCode || badge.badgeId || `BDG-${badgeId}`}
                                             </p>
                                         </div>
@@ -792,9 +2104,9 @@ const PreviewBadge = ({
                                         {failedQrs[badgeId] && (
                                             <button
                                                 onClick={() => retryLoadQR(badgeId)}
-                                                className="mt-2 sm:mt-3 text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full transition-colors duration-200 font-medium"
+                                                className="mt-2 text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-full transition-colors duration-200 font-medium"
                                             >
-                                                Retry Loading QR
+                                                Retry
                                             </button>
                                         )}
                                     </div>
@@ -805,7 +2117,6 @@ const PreviewBadge = ({
                 </div>
             )}
 
-            {/* Custom Scrollbar Styles */}
             <style jsx>{`
                 .custom-scrollbar::-webkit-scrollbar {
                     width: 4px;
@@ -821,28 +2132,6 @@ const PreviewBadge = ({
                 }
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
                     background: #94a3b8;
-                }
-                @keyframes fade-in {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                @keyframes slide-in-from-top-5 {
-                    from { transform: translateY(-10px); opacity: 0; }
-                    to { transform: translateY(0); opacity: 1; }
-                }
-                .animate-in {
-                    animation: fade-in 0.2s ease-out, slide-in-from-top-5 0.3s ease-out;
-                }
-                
-                /* Mobile dropdown positioning fix */
-                @media (max-width: 640px) {
-                    .fixed.dropdown-mobile {
-                        position: fixed;
-                        left: 1rem;
-                        right: 1rem;
-                        width: auto;
-                        max-width: none;
-                    }
                 }
             `}</style>
         </div>

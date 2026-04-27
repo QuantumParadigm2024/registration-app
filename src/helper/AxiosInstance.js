@@ -6,7 +6,12 @@ import axios from "axios";
 const axiosInstance = axios.create({
   baseURL: "http://localhost:9090",
   // baseURL:"https://registration.planotechevents.com:9090",
-  withCredentials: true,
+  // baseURL: " https://wrinkle-tastiness-plutonium.ngrok-free.dev",
+   withCredentials: true,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  }
 });
 
 // Track refresh state
@@ -15,7 +20,6 @@ let failedQueue = [];
 
 // Store navigate function for React Router navigation
 let navigateFunction = null;
-
 let notificationFunction = null;
 
 // Token keys
@@ -25,18 +29,15 @@ const REFRESH_TOKEN_KEY = "00x";
 // Create broadcast channel for cross-tab communication
 const broadcastChannel = new BroadcastChannel('auth_channel');
 
-
 // Function to set navigate from React component
 export const setNavigate = (navigate) => {
   navigateFunction = navigate;
 };
 
-
 // Function to set notification from React component
 export const setNotification = (showSessionExpired) => {
   notificationFunction = showSessionExpired;
 };
-
 
 const processQueue = (error, token = null) => {
   failedQueue.forEach(prom => {
@@ -49,15 +50,14 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-// Logout function - shows session expired notification
+// Logout function
 const logoutUser = (showNotification = true) => {
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
   Cookies.remove(REFRESH_TOKEN_KEY, { path: "/" });
 
-  // Broadcast logout to other tabs
   try {
     broadcastChannel.postMessage({ type: 'LOGOUT' });
-    console.log("📢 Logout broadcast sent from interceptor");
+    console.log("📢 Logout broadcast sent");
   } catch (e) {
     console.log("Broadcast failed:", e);
   }
@@ -66,32 +66,30 @@ const logoutUser = (showNotification = true) => {
     notificationFunction();
   } else if (navigateFunction) {
     navigateFunction("/");
-  }else{
-        window.location.href = "/";
+  } else {
+    window.location.href = "/";
   }
 };
 
 // Request interceptor
 axiosInstance.interceptors.request.use(
   (config) => {
-        // List of endpoints that DON'T need authentication
     const publicEndpoints = [
       '/user/login',
       '/user/refresh',
+      '/payment/webhook/razorpay',
     ];
 
-    // Check if current URL is a public endpoint
     const isPublicEndpoint = publicEndpoints.some(endpoint =>
       config.url === endpoint || config.url?.includes('/public/')
     );
 
-    // Skip token for public endpoints
     if (isPublicEndpoint) {
-      console.log(`📡 Public endpoint ${config.url} - no token added`);
-
+      console.log(`📡 Public endpoint ${config.url}`);
+      return config;
     }
 
-    const encryptedToken = sessionStorage.getItem("00y");
+    const encryptedToken = sessionStorage.getItem(ACCESS_TOKEN_KEY);
     if (encryptedToken) {
       try {
         const token = decryptToken(encryptedToken);
@@ -113,7 +111,6 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Handle network errors
     if (!error.response) {
       console.error("Network error:", error);
       return Promise.reject(error);
@@ -124,28 +121,22 @@ axiosInstance.interceptors.response.use(
 
     console.log(`🔴 Error ${status}: ${message}`, originalRequest?.url);
 
-  // SPECIAL CASE: If refresh token itself is expired, logout with notification
-
     if (status === 401 && (message === "Refresh token expired" || message?.includes("Refresh token expired"))) {
-
-      console.log("⏰ Refresh token expired - logging out with notification");
-
+      console.log("⏰ Refresh token expired - logging out");
       logoutUser(true);
       return Promise.reject(error);
     }
-    // IMPORTANT: Don't refresh for logout endpoint
+
+    if (originalRequest.url?.includes('/payment/order/verify')) {
+      return Promise.reject(error);
+    }
 
     if (status === 401 &&
-
       !originalRequest?._retry &&
-
       !originalRequest.url.includes('/user/login') &&
-
       !originalRequest.url.includes('/user/refresh') &&
-
-      !originalRequest.url.includes('/user/logout')) {  // ← Add this
+      !originalRequest.url.includes('/user/logout')) {
       
-      // If already refreshing, queue this request
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -163,23 +154,18 @@ axiosInstance.interceptors.response.use(
       try {
         console.log("🔄 Attempting to refresh token...");
         
-          // Get refresh token from cookie (SHARED ACROSS TABS)
         const encryptedRefreshToken = Cookies.get(REFRESH_TOKEN_KEY);
         
         if (!encryptedRefreshToken) {
-          console.log("❌ No refresh token available");
-                  throw new Error("No refresh token");
+          throw new Error("No refresh token");
         }
 
-        // Decrypt refresh token
         const refreshToken = decryptToken(encryptedRefreshToken);
         
         if (!refreshToken) {
-          console.log("❌ Invalid refresh token");
-                    throw new Error("Invalid refresh token");
+          throw new Error("Invalid refresh token");
         }
 
-        // Call refresh endpoint
         const refreshResponse = await axiosInstance.post(
           "/user/refresh",
           { refreshToken },
@@ -189,24 +175,18 @@ axiosInstance.interceptors.response.use(
           }
         );
 
-        // Get new tokens from response
         const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data;
 
-        // Validate we got new tokens
         if (!accessToken) {
           throw new Error("No access token in refresh response");
         }
-        // Store new access token in sessionStorage (tab-specific)
+        
         const encryptedNewAccessToken = encryptToken(accessToken);
         sessionStorage.setItem(ACCESS_TOKEN_KEY, encryptedNewAccessToken);
 
-        // Store new refresh token in cookie (shared across tabs)
-
-        
         if (newRefreshToken) {
-                    const encryptedNewRefreshToken = encryptToken(newRefreshToken);
+          const encryptedNewRefreshToken = encryptToken(newRefreshToken);
           Cookies.set(REFRESH_TOKEN_KEY, encryptedNewRefreshToken, {
-
             secure: true,
             sameSite: "strict",
             path: "/"
@@ -214,24 +194,15 @@ axiosInstance.interceptors.response.use(
         }
 
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-        
-        // Process queued requests with new token
         processQueue(null, accessToken);
-        
-        // Retry original request
         return axiosInstance(originalRequest);
 
       } catch (refreshError) {
         console.error("❌ Token refresh failed:", refreshError);
-        
         processQueue(refreshError, null);
         
-        // Check if refresh token expired during refresh attempt
-         if (refreshError.response?.data?.message === "Refresh token expired" ||
-
+        if (refreshError.response?.data?.message === "Refresh token expired" ||
           refreshError.response?.data?.message?.includes("Refresh token expired")) {
-
-          console.log("⏰ Refresh token expired during refresh");
           logoutUser(true);
         }
         
@@ -245,5 +216,4 @@ axiosInstance.interceptors.response.use(
   }
 );
 
-// Export both the instance and the setNavigate function
 export default axiosInstance;

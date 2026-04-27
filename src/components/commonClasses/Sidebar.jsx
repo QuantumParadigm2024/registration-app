@@ -18,6 +18,7 @@ import {
     LightMode,
     Menu,
     Close,
+     CreditCard,
 TrendingUp
 } from "@mui/icons-material";
 import { useDispatch, useSelector } from "react-redux";
@@ -161,6 +162,12 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             path: "/user-analytics",
             hidden: !hasEventRole(user) // Show only for event admins and coordinators
         },
+        {
+        name: "Payment Details", // New menu item
+        icon: <CreditCard />, // Make sure to import CreditCard from @mui/icons-material
+        path: "/payment-details",
+        hidden: !hasEventRole(user) // Show only for event admins and coordinators
+    },
         {
             name: "Settings",
             icon: <Settings />,
